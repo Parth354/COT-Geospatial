@@ -1,0 +1,204 @@
+{
+  "name": "spatialmind-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Chain-of-Thought Geospatial Workflow System Frontend - An intelligent web application for geospatial analysis and visualization with AI-powered workflow orchestration",
+  "author": "SpatialMind Team",
+  "license": "MIT",
+  "homepage": "https://spatialmind.io",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spatialmind/spatialmind-frontend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spatialmind/spatialmind-frontend/issues"
+  },
+  "keywords": [
+    "geospatial",
+    "gis",
+    "mapping",
+    "ai",
+    "llm",
+    "chain-of-thought",
+    "react",
+    "vite",
+    "leaflet",
+    "spatial-analysis",
+    "flood-mapping",
+    "earth-observation"
+  ],
+  "main": "src/main.jsx",
+  "private": true,
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.10",
+    "axios": "^1.6.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.263.1",
+    "plotly.js": "^2.26.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "react-leaflet": "^4.2.1",
+    "react-plotly.js": "^2.6.0",
+    "react-router-dom": "^6.8.0",
+    "socket.io-client": "^4.7.2",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.8",
+    "@types/plotly.js": "^2.12.29",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-react-swc": "^3.5.0",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "husky": "^9.1.7",
+    "postcss": "^8.4.32",
+    "prettier": "^3.1.1",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.0.8",
+    "vite-plugin-eslint": "^1.8.1",
+    "vite-plugin-pwa": "^0.17.4"
+  },
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx,ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext js,jsx,ts,tsx --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "type-check": "tsc --noEmit",
+    "analyze": "npm run build && npx vite-bundle-analyzer dist",
+    "clean": "rm -rf dist node_modules/.vite",
+    "docker:build": "docker build -t spatialmind-frontend .",
+    "docker:run": "docker run -p 5173:5173 spatialmind-frontend",
+    "deploy:staging": "npm run build && aws s3 sync dist/ s3://spatialmind-staging --delete",
+    "deploy:prod": "npm run build && aws s3 sync dist/ s3://spatialmind-production --delete",
+    "serve": "vite preview --port 4173 --host",
+    "test": "echo \"Tests will be added with Vitest\" && exit 0",
+    "prepare": "husky install || true"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "browser": true,
+      "es2020": true
+    },
+    "extends": [
+      "eslint:recommended",
+      "@vitejs/eslint-config-react",
+      "plugin:react/recommended",
+      "plugin:react/jsx-runtime",
+      "plugin:react-hooks/recommended"
+    ],
+    "ignorePatterns": [
+      "dist",
+      ".eslintrc.cjs"
+    ],
+    "parserOptions": {
+      "ecmaVersion": "latest",
+      "sourceType": "module"
+    },
+    "settings": {
+      "react": {
+        "version": "18.2"
+      }
+    },
+    "plugins": [
+      "react-refresh"
+    ],
+    "rules": {
+      "react-refresh/only-export-components": [
+        "warn",
+        {
+          "allowConstantExport": true
+        }
+      ],
+      "no-unused-vars": "warn",
+      "no-console": "warn",
+      "react-hooks/exhaustive-deps": "warn",
+      "react/prop-types": "off"
+    }
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 100,
+    "tabWidth": 2,
+    "useTabs": false
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all",
+      "not ie <= 11"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "config": {
+    "api": {
+      "baseUrl": "http://localhost:8000/api/v1",
+      "timeout": 30000,
+      "retries": 3
+    },
+    "websocket": {
+      "url": "ws://localhost:8000/ws",
+      "reconnectDelay": 3000,
+      "maxReconnectAttempts": 10
+    },
+    "map": {
+      "defaultCenter": [
+        12.9716,
+        77.5946
+      ],
+      "defaultZoom": 12,
+      "maxZoom": 18,
+      "minZoom": 3,
+      "tileLayer": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    },
+    "upload": {
+      "maxFileSize": "100MB",
+      "allowedFormats": [
+        ".geojson",
+        ".shp",
+        ".tif",
+        ".tiff",
+        ".json",
+        ".kml",
+        ".gpx",
+        ".csv"
+      ],
+      "maxFiles": 10,
+      "chunkSize": "5MB"
+    },
+    "chat": {
+      "maxMessages": 100,
+      "typingTimeout": 2000,
+      "messageRetentionDays": 7
+    },
+    "performance": {
+      "enableServiceWorker": true,
+      "enableGzip": true,
+      "bundleAnalyzer": false
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  }
+}

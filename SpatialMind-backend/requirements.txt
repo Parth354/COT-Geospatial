@@ -1,0 +1,29 @@
+# FastAPI & uvicorn
+fastapi
+uvicorn[standard]
+
+# SQLAlchemy
+SQLAlchemy
+
+# PostgreSQL adapter
+psycopg2-binary
+
+# GeoAlchemy & PostGIS support
+geoalchemy2
+shapely
+
+# Pydantic
+pydantic
+
+# Celery for background tasks
+celery
+redis
+
+# Alembic for migrations
+alembic
+
+# For environment variable loading (optional)
+python-dotenv
+
+# Optional for structured logging
+loguru
