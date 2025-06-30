@@ -1,5 +1,6 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict
 
 class UploadMetadata(BaseModel):
     name: Optional[str]
@@ -14,5 +15,7 @@ class UploadResponse(BaseModel):
     feature_count: int
     bbox: dict
     crs: str
-    upload_time: str
+    upload_time: datetime
     status: str
+
+    model_config = ConfigDict(from_attributes=True, ser_json_timedelta="iso8601", ser_json_bytes="utf8")

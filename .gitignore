@@ -1,0 +1,9 @@
+node_modules
+__pycache__
+gitignore
+.venv
+migrations
+static
+.env
+package-lock.json
+knowledge_base

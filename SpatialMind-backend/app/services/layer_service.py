@@ -1,70 +1,112 @@
-from sqlalchemy.orm import Session
-from typing import List, Any, Dict, Optional
-from app.models.layer import Layer
-from app.models.database import SessionLocal
 import json
-import redis
-from shapely.geometry import shape, mapping
-from geoalchemy2.functions import ST_AsGeoJSON, ST_Transform, ST_Simplify, ST_Intersects
-from sqlalchemy import func, text
-from app.core.config import settings
+import logging
+from typing import Any, Dict, List, Optional
 
-# Redis client for caching
-redis_client = redis.Redis.from_url(settings.REDIS_URL)
+import redis
+from sqlalchemy.orm import Session
+from geoalchemy2.functions import (
+    ST_AsGeoJSON, ST_Force2D, ST_Intersects,
+    ST_MakeEnvelope, ST_Simplify, ST_Transform
+)
+
+from app.core.config import settings
+from app.models.layer import Layer
+
+logger = logging.getLogger(__name__)
+
+# --- Redis Client Initialization ---
+try:
+    redis_pool = redis.ConnectionPool.from_url(settings.REDIS_URL, decode_responses=True)
+    redis_client = redis.Redis(connection_pool=redis_pool)
+    redis_client.ping()
+    logger.info("Redis client connected successfully for LayerService.")
+except redis.exceptions.ConnectionError as e:
+    logger.error(f"FATAL: Could not connect to Redis. Caching will be disabled. Error: {e}")
+    redis_client = None
+
 
 class LayerService:
+    """
+    Handles optimized retrieval of vector layer data from PostGIS for map display.
+    """
+    MAX_FEATURE_LIMIT = 5000
+
     @staticmethod
     def get_layer_data(
         db: Session,
-        layer_id: str,
+        layer_id: str,  # This ID now corresponds to a dataset_id
         bbox: Optional[List[float]] = None,
-        simplify_tolerance: Optional[float] = None
-    ) -> Dict[str, Any]:
-        # Check cache first
-        cache_key = f"layer:{layer_id}:{bbox}:{simplify_tolerance}"
-        cached = redis_client.get(cache_key)
-        if cached:
-            return json.loads(cached)
+        zoom: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        
+        simplify_tolerance = LayerService._calculate_simplification(zoom)
+        bbox_str = ",".join(map(str, bbox)) if bbox else "none"
+        cache_key = f"layer_data:v3:{layer_id}:{bbox_str}:{simplify_tolerance}"
 
-        # Fetch layer metadata
-        layer = db.query(Layer).filter(Layer.layer_id == layer_id).first()
-        if not layer:
-            return None
+        if redis_client:
+            try:
+                cached = redis_client.get(cache_key)
+                if cached:
+                    logger.info(f"Cache HIT for key: {cache_key}")
+                    return json.loads(cached)
+            except redis.exceptions.RedisError as e:
+                logger.error(f"Redis cache GET failed for key {cache_key}: {e}")
 
-        # Build PostGIS query
-        geom_col = text("geom")
-        query = db.query(
-            func.ST_AsGeoJSON(
+        logger.info(f"Cache MISS for key: {cache_key}")
+
+        # ✅ FIX: Filter by the dataset_id, not the layer_id (which is a feature's primary key).
+        # The incoming `layer_id` parameter actually represents the ID of the parent dataset.
+        base_query = db.query(Layer.geom, Layer.properties).filter(Layer.dataset_id == layer_id)
+
+        # Apply bbox filtering only at zoom levels 10 and above for performance
+        if bbox and zoom is not None and zoom >= 10:
+            west, south, east, north = bbox
+            envelope = ST_MakeEnvelope(west, south, east, north, 4326)
+            base_query = base_query.filter(ST_Intersects(Layer.geom, envelope))
+        else:
+            logger.info(f"Fetching full layer without bbox filter for zoom level {zoom}")
+
+        limited_query = base_query.limit(LayerService.MAX_FEATURE_LIMIT).subquery('limited_features')
+
+        final_query = db.query(
+            ST_AsGeoJSON(
                 ST_Transform(
-                    ST_Simplify(func.ST_Force2D(func.cast(text("geom"), text("geometry"))), simplify_tolerance if simplify_tolerance else 0),
+                    ST_Simplify(
+                        ST_Transform(ST_Force2D(limited_query.c.geom), 3857),
+                        simplify_tolerance
+                    ),
                     4326
                 )
             ).label("geojson"),
-            text("properties")
+            limited_query.c.properties.label("properties")
         )
-        if bbox:
-            west, south, east, north = bbox
-            query = query.filter(
-                ST_Intersects(
-                    func.ST_MakeEnvelope(west, south, east, north, 4326),
-                    text("geom")
-                )
-            )
-        results = query.all()
 
-        # Assemble features
-        features = []
-        for row in results:
-            geo = json.loads(row.geojson)
-            props = row.properties
-            features.append({
-                "type": "Feature",
-                "geometry": geo,
-                "properties": props
-            })
+        try:
+            results = final_query.all()
+        except Exception as e:
+            logger.error(f"Error querying PostGIS layer '{layer_id}': {e}", exc_info=True)
+            raise
 
-        response = {"type": "FeatureCollection", "features": features}
+        features = [
+            {"type": "Feature", "geometry": json.loads(row.geojson), "properties": row.properties}
+            for row in results
+            if row.geojson
+        ]
 
-        # Cache for 1 hour
-        redis_client.setex(cache_key, 3600, json.dumps(response))
-        return response
+        feature_collection = {"type": "FeatureCollection", "features": features}
+
+        if redis_client and features: # Also good practice to only cache if there's data
+            try:
+                # Set a shorter cache time for empty results if desired, or don't cache them at all
+                redis_client.setex(cache_key, 3600, json.dumps(feature_collection))
+            except redis.exceptions.RedisError as e:
+                logger.error(f"Redis cache SET failed for key {cache_key}: {e}")
+
+        return feature_collection
+
+    @staticmethod
+    def _calculate_simplification(zoom: Optional[int]) -> float:
+        if zoom is None or zoom > 18:
+            return 0  # No simplification or maximum detail
+        # A common simplification formula based on web mercator projection properties
+        return 40075016.686 / (256 * (2 ** zoom)) / 10

@@ -1,294 +1,172 @@
-import React, { useState, useRef } from 'react'
-import { Upload, FileText, X, CheckCircle, AlertCircle, Loader } from 'lucide-react'
-import { useAppContext } from '../hooks/useAppContext'
-import { uploadAPI, datasetsAPI } from '../services/api' 
+import React, { useState, useRef, useCallback } from 'react';
+import { Upload, FileText, X, CheckCircle, AlertTriangle, Loader, Layers, Database } from 'lucide-react';
+import { useAppContext } from '../hooks/AppContext';
+import DatasetItem from './DataSeItem.jsx';
+import MetadataModal from './MetadataModal.jsx';
+import { uploadAPI } from '../api/uploadAPI.js';
 
 function DataUpload() {
-  const { state, dispatch } = useAppContext()
-  const [dragActive, setDragActive] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState({})
-  const fileInputRef = useRef(null)
+    const { state, actions } = useAppContext();
+    const [dragActive, setDragActive] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState({});
+    const [stagedFile, setStagedFile] = useState(null);
+    const fileInputRef = useRef(null);
 
-  const supportedFormats = [
-    { ext: '.geojson', type: 'GeoJSON', description: 'Vector data format' },
-    { ext: '.shp', type: 'Shapefile', description: 'Vector data format (with .dbf, .shx)' },
-    { ext: '.zip', type: 'Shapefile Archive', description: 'Zipped shapefile bundle' },
-    { ext: '.tif', type: 'GeoTIFF', description: 'Raster data format' },
-    { ext: '.tiff', type: 'GeoTIFF', description: 'Raster data format' },
-    { ext: '.kml', type: 'KML', description: 'Google Earth format' },
-    { ext: '.csv', type: 'CSV', description: 'Tabular data with coordinates' }
-  ]
+    const processFile = useCallback(async (file, metadata) => {
+        const fileId = `${file.name}-${file.lastModified}`;
+        setUploadProgress(prev => ({ ...prev, [fileId]: { progress: 0, status: 'uploading' } }));
 
-  const validateFile = (file) => {
-    const fileName = file.name.toLowerCase()
-    const validExtensions = supportedFormats.map(f => f.ext)
-    const isValidFormat = validExtensions.some(ext => fileName.endsWith(ext))
+        try {
+            await uploadAPI.uploadFile({ 
+                file, 
+                metadata, 
+                onProgress: (p) => setUploadProgress(prev => ({ 
+                    ...prev, 
+                    [fileId]: { ...prev[fileId], progress: p } 
+                })) 
+            }, actions);
 
-    if (!isValidFormat) {
-      return { valid: false, error: 'Unsupported file format' }
-    }
-
-    if (file.size > 100 * 1024 * 1024) {  // API spec: max 100MB
-      return { valid: false, error: 'File size exceeds 100MB limit' }
-    }
-
-    return { valid: true }
-  }
-
-  const handleFiles = async (files) => {
-    const fileList = Array.from(files)
-
-    for (const file of fileList) {
-      const validation = validateFile(file)
-
-      if (!validation.valid) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: `${file.name}: ${validation.error}`
-        })
-        continue
-      }
-
-      await processFile(file)
-    }
-  }
-
-  const processFile = async (file) => {
-    const fileId = `${Date.now()}-${file.name}`
-
-    setUploadProgress(prev => ({
-      ...prev,
-      [fileId]: { progress: 0, status: 'uploading' }
-    }))
-
-    try {
-      // Call upload API with progress callback - matches API spec
-      const response = await uploadAPI.uploadFile(file, {
-        name: file.name,
-        description: '',
-        tags: []
-      }, (progress) => {
-        setUploadProgress(prev => ({
-          ...prev,
-          [fileId]: { progress, status: 'uploading' }
-        }))
-      })
-
-      setUploadProgress(prev => ({
-        ...prev,
-        [fileId]: { progress: 100, status: 'completed' }
-      }))
-
-      // Add dataset to state using API response structure from spec
-      dispatch({
-        type: 'ADD_DATASET',
-        payload: {
-          datasetId: response.dataset_id,        // API spec uses snake_case
-          name: response.name,
-          fileType: response.file_type,          // API spec uses snake_case
-          sizeMb: response.size_mb,              // API spec uses snake_case
-          featureCount: response.feature_count,  // API spec uses snake_case
-          bbox: response.bbox,
-          crs: response.crs,
-          uploadTime: response.upload_time,      // API spec uses snake_case
-          status: response.status,
-          tags: response.tags || []
+            setUploadProgress(prev => ({ ...prev, [fileId]: { progress: 100, status: 'completed' } }));
+            
+            setTimeout(() => {
+                setUploadProgress(prev => {
+                    const newProgress = { ...prev };
+                    delete newProgress[fileId];
+                    return newProgress;
+                });
+            }, 3000);
+        } catch (error) {
+            console.error("Upload failed:", error);
+            setUploadProgress(prev => ({ 
+                ...prev, 
+                [fileId]: { status: 'error', error: error.message } 
+            }));
+            
+            setTimeout(() => {
+                setUploadProgress(prev => {
+                    const newProgress = { ...prev };
+                    delete newProgress[fileId];
+                    return newProgress;
+                });
+            }, 8000);
         }
-      })
+    }, [actions]);
 
-      // Note: API spec doesn't include map layer in upload response
-      // Map layers are created through analysis results, not uploads
+    const handleFileSelected = useCallback((files) => {
+        const file = Array.from(files).find(f => f.size > 0);
+        if (file) setStagedFile(file);
+    }, []);
 
-      // Clear progress after delay
-      setTimeout(() => {
-        setUploadProgress(prev => {
-          const updated = { ...prev }
-          delete updated[fileId]
-          return updated
-        })
-      }, 3000)
+    const handleModalUpload = useCallback((metadata) => {
+        if (stagedFile) {
+            processFile(stagedFile, metadata);
+        }
+        setStagedFile(null);
+    }, [stagedFile, processFile]);
 
-    } catch (error) {
-      setUploadProgress(prev => ({
-        ...prev,
-        [fileId]: { progress: 0, status: 'error', error: error.message }
-      }))
+    const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); };
+    const handleDragIn = (e) => { handleDrag(e); setDragActive(true); };
+    const handleDragOut = (e) => { handleDrag(e); setDragActive(false); };
+    const handleDrop = (e) => {
+        handleDrag(e);
+        setDragActive(false);
+        if (e.dataTransfer.files?.length) {
+            handleFileSelected(e.dataTransfer.files);
+        }
+    };
 
-      dispatch({
-        type: 'SET_ERROR',
-        payload: `Failed to upload ${file.name}: ${error.message}`
-      })
-    }
-  }
+    const handleInputChange = (e) => {
+        e.preventDefault();
+        if (e.target.files?.length) {
+            handleFileSelected(e.target.files);
+        }
+        e.target.value = ''; // Reset input
+    };
 
-  const handleDrag = (e) => { e.preventDefault(); e.stopPropagation() }
-  const handleDragIn = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true) }
-  const handleDragOut = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false) }
-  const handleDrop = (e) => {
-    e.preventDefault(); e.stopPropagation(); setDragActive(false)
-    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files)
-  }
-
-  const handleInputChange = (e) => {
-    if (e.target.files) handleFiles(e.target.files)
-  }
-
-  const removeDataset = async (datasetId) => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true })
-      
-      // Call API to delete dataset
-      await datasetsAPI.deleteDataset(datasetId)
-      
-      // Remove from state
-      dispatch({ type: 'REMOVE_DATASET', payload: datasetId })
-      
-      // Also remove associated map layer if exists
-      const associatedLayer = state.mapLayers.find(layer => 
-        layer.datasetId === datasetId || layer.name === state.uploadedDatasets.find(d => d.datasetId === datasetId)?.name
-      )
-      if (associatedLayer) {
-        dispatch({ type: 'REMOVE_LAYER', payload: associatedLayer.layerId })
-      }
-      
-    } catch (error) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: `Failed to delete dataset: ${error.message}`
-      })
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false })
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Upload UI */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Geospatial Data</h3>
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-          }`}
-          onDragEnter={handleDragIn}
-          onDragLeave={handleDragOut}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-lg font-medium text-gray-900 mb-2">Drop files here or click to browse</p>
-          <p className="text-sm text-gray-500 mb-4">Support for GeoJSON, Shapefiles, GeoTIFF, KML, and CSV files (max 100MB)</p>
-          <button onClick={() => fileInputRef.current?.click()} className="btn btn-primary">
-            Choose Files
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".geojson,.shp,.zip,.tif,.tiff,.kml,.csv"
-            onChange={handleInputChange}
-            className="hidden"
-          />
-        </div>
-
-        {/* Supported Formats */}
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Supported Formats</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {supportedFormats.map((format) => (
-              <div key={format.ext} className="text-xs bg-gray-50 rounded p-2">
-                <div className="font-medium text-gray-900">{format.type}</div>
-                <div className="text-gray-500">{format.description}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Upload Progress */}
-      {Object.keys(uploadProgress).length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border p-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Upload Progress</h4>
-          <div className="space-y-2">
-            {Object.entries(uploadProgress).map(([fileId, progress]) => (
-              <div key={fileId} className="flex items-center space-x-3">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-900">{fileId.split('-').slice(1).join('-')}</span>
-                    <span className="text-xs text-gray-500">{progress.progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        progress.status === 'completed' ? 'bg-green-500' :
-                        progress.status === 'error' ? 'bg-red-500' : 'bg-blue-500'
-                      }`}
-                      style={{ width: `${progress.progress}%` }}
+    return (
+        <div className="space-y-4 p-4 bg-gray-100 h-full overflow-y-auto">
+            {stagedFile && (
+                <MetadataModal 
+                    file={stagedFile} 
+                    onUpload={handleModalUpload} 
+                    onCancel={() => setStagedFile(null)} 
+                />
+            )}
+            
+            {/* Upload Area */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Data Management</h3>
+                <div 
+                    onClick={() => fileInputRef.current?.click()} 
+                    onDragEnter={handleDragIn} 
+                    onDragLeave={handleDragOut} 
+                    onDragOver={handleDrag} 
+                    onDrop={handleDrop} 
+                    className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
+                        dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'
+                    }`}
+                >
+                    <Upload className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+                    <p className="font-medium text-gray-700">
+                        Drop file or <span className="text-blue-600">browse</span>
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                        GeoJSON, Shapefile (.zip), KML, GeoTIFF, etc.
+                    </p>
+                    <input 
+                        ref={fileInputRef} 
+                        type="file" 
+                        onChange={handleInputChange} 
+                        className="hidden" 
+                        accept=".geojson,.json,.zip,.kml,.kmz,.tiff,.tif,.shp"
                     />
-                  </div>
-                  {progress.error && (
-                    <p className="text-xs text-red-600 mt-1">{progress.error}</p>
-                  )}
                 </div>
-                {progress.status === 'uploading' && <Loader className="h-4 w-4 animate-spin text-blue-500" />}
-                {progress.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
-                {progress.status === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Uploaded Datasets */}
-      {state.uploadedDatasets.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border p-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Uploaded Datasets</h4>
-          <div className="space-y-2">
-            {state.uploadedDatasets.map((dataset) => (
-              <div key={dataset.datasetId} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                <div className="flex items-center space-x-3">
-                  <FileText className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{dataset.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {dataset.fileType} • {dataset.sizeMb?.toFixed(2)} MB
-                      {dataset.featureCount && ` • ${dataset.featureCount} features`}
-                      {dataset.crs && ` • ${dataset.crs}`}
+            {/* Upload Progress */}
+            {Object.keys(uploadProgress).length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm border p-4 space-y-3">
+                    <h4 className="text-sm font-medium text-gray-700">Upload Progress</h4>
+                    {Object.entries(uploadProgress).map(([id, info]) => (
+                        <div key={id} className="flex items-center gap-3">
+                            <p className="text-sm text-gray-800 truncate flex-1">
+                                {id.split('-').slice(0, -1).join('-')}
+                            </p>
+                            <div className="w-24 bg-gray-200 rounded-full h-2">
+                                <div 
+                                    className={`h-2 rounded-full transition-all ${
+                                        info.status === 'completed' ? 'bg-green-500' : 
+                                        info.status === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                                    }`} 
+                                    style={{ width: `${info.progress || 0}%` }} 
+                                />
+                            </div>
+                            {info.status === 'uploading' && <Loader className="h-4 w-4 animate-spin text-blue-500" />}
+                            {info.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                            {info.status === 'error' && <AlertTriangle className="h-4 w-4 text-red-500" title={info.error} />}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Dataset List */}
+            {state.uploadedDatasets.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm border p-4">
+                    <h4 className="text-base font-semibold text-gray-800 mb-3">
+                        Available Datasets ({state.uploadedDatasets.length})
+                    </h4>
+                    <div className="space-y-2 max-h-[calc(100vh-500px)] overflow-y-auto pr-2">
+                        {state.uploadedDatasets
+                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                            .map((dataset) => (
+                                <DatasetItem key={dataset.dataset_id} dataset={dataset} />
+                            ))
+                        }
                     </div>
-                    {dataset.tags && dataset.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {dataset.tags.map((tag, index) => (
-                          <span key={index} className="px-1 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    dataset.status === 'ready' ? 'bg-green-100 text-green-800' : 
-                    dataset.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {dataset.status}
-                  </span>
-                  <button 
-                    onClick={() => removeDataset(dataset.datasetId)} 
-                    className="p-1 rounded hover:bg-red-100 text-red-600"
-                    disabled={state.loading}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+            )}
         </div>
-      )}
-    </div>
-  )
+    );
 }
 
-export default DataUpload
+export default DataUpload;

@@ -1,5 +1,3 @@
-# app/schemas/query.py
-
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -17,9 +15,11 @@ class QueryRequest(BaseModel):
     query: str
     session_id: str
     context: Optional[QueryContext] = None
+    model_type: Optional[str] = 'mistral'
 
 class QueryResponse(BaseModel):
     job_id: str
     status: str
+    message: str 
     estimated_time: str
     websocket_channel: str

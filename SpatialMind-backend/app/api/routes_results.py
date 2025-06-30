@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+import os
+import logging
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse # More secure for file downloads
 from sqlalchemy.orm import Session
+
 from app.schemas.result import ResultsResponse
 from app.services.result_service import ResultService
 from app.models.database import SessionLocal
-import os
+from app.core.config import settings
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/results", tags=["Results"])
 
 def get_db():
     db = SessionLocal()
@@ -14,41 +20,33 @@ def get_db():
     finally:
         db.close()
 
-@router.get(
-    "/results/{job_id}",
-    response_model=ResultsResponse
-)
+@router.get("/{job_id}", response_model=ResultsResponse)
 def get_results(job_id: str, db: Session = Depends(get_db)):
     """
-    Retrieve analysis results for a given job.
+    Retrieves the final results of a completed analysis job, including metadata
+    and pointers to downloadable artifacts.
     """
     res = ResultService.get_result_by_job(db, job_id)
-    if res is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Results not found"
-        )
+    if not res:
+        raise HTTPException(status_code=404, detail="Results not found for the given Job ID.")
     return res
 
-@router.get(
-    "/download/{job_id}/{filename}"
-)
+@router.get("/download/{job_id}/{filename}")
 def download_file(job_id: str, filename: str):
     """
-    Serve a file from the result's output directory.
+    Securely downloads a result artifact for a given job.
+    This prevents directory traversal attacks.
     """
-    base_dir = os.getenv("RESULTS_DIR", "/data/results")
-    file_path = os.path.join(base_dir, job_id, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found"
-        )
-    # Stream file
-    return Response(
-        content=open(file_path, "rb").read(),
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        }
-    )
+    # Define the secure base directory for the job's results
+    job_results_dir = Path(settings.RESULT_DIR).resolve() / job_id
+    
+    # Create the full path and ensure it's a real file
+    file_path = job_results_dir / filename
+    
+    # Security Check: Ensure the resolved path is still within the job's result directory
+    # to prevent path traversal attacks (e.g., filename = "../../../etc/passwd")
+    if not file_path.is_file() or not file_path.resolve().is_relative_to(job_results_dir.resolve()):
+        raise HTTPException(status_code=404, detail="File not found or access denied.")
+
+    # Use FastAPI's FileResponse for efficient and secure file sending
+    return FileResponse(path=file_path, filename=filename, media_type="application/octet-stream")

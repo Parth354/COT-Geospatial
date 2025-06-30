@@ -1,16 +1,18 @@
-import os
-import shutil
 import logging
-from sqlalchemy.orm import Session
+from pathlib import Path
+import shutil
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.schemas.dataset import DatasetResponse # Use a specific response schema
 from app.models.database import SessionLocal
 from app.models.dataset import Dataset
-from app.schemas.upload import UploadResponse
-
-router = APIRouter()
+from app.models.layer import Layer # Needed for cascading deletes
 
 logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 def get_db():
     db = SessionLocal()
@@ -19,62 +21,60 @@ def get_db():
     finally:
         db.close()
 
-@router.get(
-    "/datasets",
-    response_model=List[UploadResponse]
-)
+@router.get("/", response_model=List[DatasetResponse])
 def list_datasets(db: Session = Depends(get_db)):
-    """List all uploaded datasets."""
-    datasets = db.query(Dataset).all()
-    return [
-        UploadResponse(
-            dataset_id=ds.dataset_id,
-            name=ds.name,
-            file_type=ds.file_type,
-            size_mb=ds.size_mb,
-            feature_count=ds.feature_count,
-            bbox=ds.bbox,
-            crs=ds.crs,
-            upload_time=ds.upload_time.isoformat(),
-            status=ds.status
-        ) for ds in datasets
-    ]
+    """
+    Retrieves a list of all raw datasets that have been uploaded to the system.
+    """
+    datasets = db.query(Dataset).order_by(Dataset.upload_time.desc()).all()
+    # The `from_attributes=True` config in your Pydantic model handles the conversion
+    return datasets
 
-@router.delete(
-    "/datasets/{dataset_id}",
-    status_code=status.HTTP_204_NO_CONTENT
-)
+
+@router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_dataset(dataset_id: str, db: Session = Depends(get_db)):
-    """Delete a dataset record and remove its uploaded files from disk."""
-    # Find dataset
-    ds = db.query(Dataset).filter(Dataset.dataset_id == dataset_id).first()
+    """
+    Deletes a dataset and all associated data, including its record, any ingested
+    layer features in PostGIS, and its files on the disk.
+    """
+    logger.info(f"Received request to delete dataset '{dataset_id}'.")
 
-    if not ds:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Dataset not found"
-        )
+    # Use a single, comprehensive transaction for all database operations
+    try:
+        # Step 1: Find the dataset record to get file path information
+        ds = db.query(Dataset).filter(Dataset.dataset_id == dataset_id).first()
+        if not ds:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+        
+        # This is the directory that FileService created, e.g., .../uploads/<dataset_id>/
+        dataset_directory = Path(ds.file_path).parent
 
-    # Delete DB record
-    db.delete(ds)
-    db.commit()
-    logger.info(f"Deleted dataset record {dataset_id} from DB.")
+        # Step 2: Delete associated Layer features from PostGIS first
+        # This respects foreign key constraints.
+        deleted_layer_count = db.query(Layer).filter(Layer.dataset_id == dataset_id).delete()
+        if deleted_layer_count > 0:
+            logger.info(f"Deleted {deleted_layer_count} associated layer features from PostGIS for dataset '{dataset_id}'.")
 
-    # Delete from uploads directory
-    upload_dir = os.getenv("UPLOAD_DIR", "uploads")  # matches FileService default
-    dataset_path = os.path.join(upload_dir, dataset_id)
+        # Step 3: Delete the main dataset record
+        db.delete(ds)
+        
+        # Step 4: Commit all database changes together
+        db.commit()
+        logger.info(f"Successfully deleted database records for dataset '{dataset_id}'.")
 
-    if os.path.exists(dataset_path):
-        try:
-            shutil.rmtree(dataset_path)
-            logger.info(f"Deleted folder: {dataset_path}")
-        except Exception as e:
-            logger.error(f"Failed to delete {dataset_path}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error deleting files for dataset {dataset_id}"
-            )
-    else:
-        logger.warning(f"No folder found to delete for dataset {dataset_id} at {dataset_path}")
+        # Step 5: Clean up the files from the disk *after* the database transaction succeeds
+        if dataset_directory.is_dir():
+            shutil.rmtree(dataset_directory)
+            logger.info(f"Successfully deleted data directory from disk: {dataset_directory}")
 
-    return None
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete dataset '{dataset_id}'. Error: {e}", exc_info=True)
+        # We check if it's our own HTTPException or an unexpected server error
+        if not isinstance(e, HTTPException):
+             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred while deleting the dataset.")
+        else:
+             raise e
+    
+    # HTTP 204 has no content, so we return nothing
+    return

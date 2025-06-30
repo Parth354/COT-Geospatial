@@ -1,39 +1,73 @@
-import React, { useEffect } from 'react'
-import { AppProvider } from './hooks/useAppContext'
-import ChatWindow from './components/ChatWindow'
-import Layout from './components/Layout'
-import MapViewer from './components/MapViewer'
-import ResultPanel from './components/ResultPanel'
-import NotificationSystem from './components/NotificationSystem'
-import DataUpload from './components/DataUpload'
-import webSocketService from './services/websocket'
+import React, { useEffect } from 'react';
+import { Cloud, BarChart3 } from 'lucide-react';
+import { AppProvider, useAppContext } from './hooks/AppContext';
+import ErrorBoundary from './components/ErrorBoundary';
+import webSocketService from './socket/websocket.js';
+import Layout from './components/Layout';
+import { ResizablePanelHorizontal } from './components/ui/ResizablePanelHorizontal';
+import { ResizablePanelVertical } from './components/ui/ResizablePanelVertical';
+import { TabbedPanel } from './components/ui/TabbedPanel';
+import MapViewer from './components/MapViewer';
+import ChatWindow from './components/ChatWindow';
+import DataUpload from './components/DataUpload';
+import ResultPanel from './components/ResultPanel';
+import NotificationSystem from './components/NotificationSystem';
+
+
+const WebSocketManager = () => {
+  const { dispatch } = useAppContext();
+
+  useEffect(() => {
+    console.log("WebSocketManager: Registering central dispatcher with WebSocket service.");
+    webSocketService.registerDispatcher(dispatch);
+
+    return () => {
+      console.log("WebSocketManager: Unregistering dispatcher.");
+      webSocketService.unregisterDispatcher();
+    };
+  }, [dispatch]);
+
+  return null;
+};
+
 
 function App() {
-  useEffect(() => {
-    webSocketService.connect().catch(console.error)
-    return () => webSocketService.disconnect()
-  }, [])
+  const sidebarTabs = [
+    { id: 'data', label: 'Data', icon: Cloud, component: DataUpload },
+    { id: 'results', label: 'Results', icon: BarChart3, component: ResultPanel },
+  ];
+
+  const LeftPanelContent = (
+    <div className="h-full p-4 pl-4 pr-2 relative z-20">
+      <TabbedPanel tabs={sidebarTabs} />
+    </div>
+  );
+
+  const RightPanelContent = (
+    <div className="h-full p-4 pr-4 pl-2 relative z-10">
+      <ResizablePanelVertical
+        topPanel={<MapViewer />}
+        bottomPanel={<ChatWindow />}
+        defaultHeight={65}
+      />
+    </div>
+  );
 
   return (
-    <AppProvider>
-      {/* Render notifications OUTSIDE Layout so they're not clipped or overlapped */}
-      <NotificationSystem />
-
-      <Layout>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 h-full gap-4 p-4">
-          <div className="col-span-1 h-full flex flex-col space-y-4">
-            <DataUpload />
-            <ResultPanel />
-          </div>
-
-          <div className="col-span-1 lg:col-span-2 h-full flex flex-col space-y-4">
-            <MapViewer />
-            <ChatWindow />
-          </div>
-        </div>
-      </Layout>
-    </AppProvider>
-  )
+    <ErrorBoundary>
+      <AppProvider>
+        <WebSocketManager />
+        <NotificationSystem />
+        <Layout>
+          <ResizablePanelHorizontal
+            leftPanel={LeftPanelContent}
+            rightPanel={RightPanelContent}
+            defaultWidth={25}
+          />
+        </Layout>
+      </AppProvider>
+    </ErrorBoundary>
+  );
 }
 
-export default App
+export default App;
