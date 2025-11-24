@@ -1,0 +1,59 @@
+SpatialMind Backend – Quick Start
+=================================
+.venv\Scripts\activate
+1. Prerequisites
+   - Python 3.11/3.12/3.13 (match the GDAL wheel you install).
+   - PostgreSQL 14+ with PostGIS enabled and a database (default: spatialdb).
+   - Upstash Redis URL (copy `rediss://:<password>@<host>:<port>` from the Upstash console).
+   - Node.js is only required for the frontend; you can skip it for backend-only work.
+
+2. Environment Setup
+   - Create and activate a virtual environment:
+       python -m venv .venv
+         (PowerShell)
+   - Install GDAL/Fiona wheel first (ships with compiled binaries):
+       pip install .\gdal-3.10.2-cp313-cp313-win_amd64.whl
+       # pick the wheel that matches your Python version if different
+   - Install backend dependencies:
+       pip install -r requirements.txt
+
+3. Configure Environment Variables
+   - Copy `.env.example` (if it exists) or create `.env` in `SpatialMind-backend/` with:
+       DATABASE_URL=postgresql://postgres:<password>@localhost:5432/spatialdb
+       REDIS_URL=rediss://:<upstash-token>@<upstash-host>:<port>
+       CELERY_BROKER_URL=${REDIS_URL}
+       CELERY_RESULT_BACKEND=${REDIS_URL}
+       UPLOAD_DIR=C:\Users\cosmi\Desktop\COT-Geospatial\SpatialMind-backend\uploads
+       RESULT_DIR=C:\Users\cosmi\Desktop\COT-Geospatial\SpatialMind-backend\results
+       GOOGLE_API_KEY=<optional if using Gemini>
+       HUGGINGFACE_HUB_TOKEN=<optional if pulling HF models>
+   - For Upstash you must use the `rediss://` URL so TLS is used automatically. No extra firewall rules are needed because Upstash is public over TLS.
+
+4. Database Prep
+   - Set `DATABASE_URL` to your Postgres/PostGIS instance.
+   - Run Alembic migrations from the backend root:
+       alembic upgrade head
+
+5. Required Background Services
+   - Redis (Upstash): no process to run locally, just ensure the URL is reachable. The app now reads the full URL for both sync/async Redis clients, so TLS endpoints work out of the box.
+   - Celery worker (executes ingestion + agent jobs):
+       celery -A app.core.celery_app.celery_app worker -l info -Q celery -P solo
+     `-P solo` avoids multiprocessing issues on Windows. Keep this terminal open.
+
+6. Launch the FastAPI Server
+   - From `SpatialMind-backend/`:
+       uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   - Verify health by visiting `http://localhost:8000/docs`. Upload datasets via `/api/upload`, trigger ingestion via `/api/layers/ingest/{dataset_id}`, and submit AI jobs via `/api/query`.
+
+7. Optional Utilities
+   - `python app/scripts/download_model.py` pre-caches the OPT model if you use a local LLM.
+   - `python app/scripts/index_system_files.py` builds the FAISS index described in the LLM prompt so system datasets are discoverable.
+
+8. Common Issues
+   - If GeoPandas install fails, confirm the GDAL wheel matches the current Python minor version and that `pip show gdal` succeeds before installing the rest.
+   - For Upstash you must allow outbound HTTPS/TLS from your machine; blocked corporate proxies will cause Redis connection errors.
+   - When running Celery on Windows, always use `-P solo`; the prefork pool is unsupported.
+
+That’s it—after these steps the backend will watch Redis (Upstash) for jobs, run Celery workers, and serve API/WebSocket traffic on port 8000.
+
+

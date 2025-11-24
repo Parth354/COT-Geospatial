@@ -5,7 +5,6 @@
   "description": "Chain-of-Thought Geospatial Workflow System Frontend - An intelligent web application for geospatial analysis and visualization with AI-powered workflow orchestration",
   "author": "SpatialMind Team",
   "license": "MIT",
-  "homepage": "https://spatialmind.io",
   "repository": {
     "type": "git",
     "url": "https://github.com/spatialmind/spatialmind-frontend.git"
@@ -35,8 +34,8 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.263.1",
     "plotly.js": "^2.26.0",
-    "react": ">=18.0.0",
-    "react-dom": ">=18.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-leaflet": "^4.2.1",
     "react-plotly.js": "^2.6.0",
     "react-router-dom": "^6.8.0",
@@ -198,7 +197,7 @@
     }
   },
   "peerDependencies": {
-    "react": ">=18.0.0",
-    "react-dom": ">=18.0.0"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }

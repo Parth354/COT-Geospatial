@@ -14,6 +14,7 @@ shapely
 
 # Pydantic
 pydantic
+pydantic-settings
 
 # Celery for background tasks
 celery
@@ -27,3 +28,21 @@ python-dotenv
 
 # Optional for structured logging
 loguru
+
+# FastAPI Upload handling
+python-multipart
+
+# Geospatial data processing
+geopandas
+pandas
+rasterio
+
+# LLM + LangChain stack
+langchain-core
+langchain-community
+langchain-google-genai
+duckduckgo-search
+sentence-transformers
+faiss-cpu
+transformers
+google-generativeai
