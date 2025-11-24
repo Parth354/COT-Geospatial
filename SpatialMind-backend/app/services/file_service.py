@@ -90,7 +90,7 @@ class FileService:
                     feature_count=geo_info.get("feature_count", 0),
                     bbox=geo_info.get("bbox", {}),
                     crs=geo_info.get("crs", "N/A"),
-                    status="processed", # Assume processing is complete upon successful saving
+                    status="uploaded", # Set to 'uploaded' - ingestion must be triggered separately via /api/layers/ingest/{dataset_id}
                     tags=metadata.tags if isinstance(metadata.tags, list) else [],
                 )
                 db.add(ds)

@@ -29,12 +29,79 @@ export function jobReducer(state, action) {
         activeJobId: null,
       };
 
+    case 'JOB_COMPLETE': {
+      const { results, message, analysis_summary } = action.payload;
+      const layers = results?.layers || [];
+      
+      // Update the message with final status
+      const updatedState = {
+        ...updateActiveJobMessage(state, { 
+          final_status: { 
+            status: 'completed', 
+            message: message || 'Job completed successfully.',
+            analysis_summary 
+          } 
+        }),
+        isAgentLoading: false,
+        activeJobId: null,
+        results: {
+          jobId: state.activeJobId,
+          summary: message,
+          layers: layers,
+          analysis_summary: analysis_summary
+        },
+        // Flag to auto-add layers to map
+        _pendingLayersToAdd: layers.map(layer => ({
+          layerId: `${state.activeJobId}-${layer.layer_name}`,
+          name: layer.layer_name,
+          type: 'analysis_result',
+          visible: true,
+          dataUrl: layer.url,
+          featureCount: layer.feature_count,
+          bbox: layer.bbox,
+          style: layer.style || { color: '#ff5722', fillOpacity: 0.6, weight: 2 },
+          datasetId: state.activeJobId,
+        }))
+      };
+      return updatedState;
+    }
+
     case 'INGESTION_COMPLETE':
     case 'INGESTION_FAILED': {
-        const payload = action.payload.ingestion_complete || action.payload.ingestion_failed;
-        const jobId = payload.job_id || payload.layer?.layer_id;
-        const newNotification = { id: `ingest_${jobId}`, type: 'assistant', jobId: jobId, cot: action.payload };
-        return { ...state, messages: [...state.messages, newNotification]};
+        // Handle both direct payload and nested payload structures
+        // The payload structure is: { ingestion_complete: {...} } or { ingestion_failed: {...} }
+        const ingestionPayload = action.payload?.ingestion_complete || action.payload?.ingestion_failed || action.payload;
+        
+        if (!ingestionPayload) {
+            console.warn(`[jobReducer] ${action.type} received but no payload found:`, action.payload);
+            return state;
+        }
+        
+        const datasetId = ingestionPayload?.dataset_id || ingestionPayload?.layer?.layer_id;
+        const jobId = ingestionPayload?.job_id || datasetId;
+        
+        console.log(`📦 Ingestion ${action.type}:`, { datasetId, jobId, payload: ingestionPayload });
+        
+        if (!datasetId) {
+            console.warn(`[jobReducer] ${action.type} received but no dataset_id found in payload:`, ingestionPayload);
+            return state;
+        }
+        
+        const newNotification = { 
+            id: `ingest_${jobId || Date.now()}`, 
+            type: 'assistant', 
+            jobId: jobId, 
+            cot: { [action.type.toLowerCase()]: ingestionPayload }
+        };
+        
+        // Return state with notification and flag to update dataset status
+        return { 
+            ...state, 
+            messages: [...state.messages, newNotification],
+            _pendingDatasetUpdate: action.type === 'INGESTION_COMPLETE' 
+                ? { datasetId, status: 'processed' } 
+                : { datasetId, status: 'ingestion_failed' }
+        };
     }
 
     default:

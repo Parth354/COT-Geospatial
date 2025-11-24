@@ -52,29 +52,33 @@ function ChatWindow() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-100 border rounded-lg shadow-inner">
-      <header className="p-3 bg-white border-b flex justify-between items-center rounded-t-lg">
-        <h2 className="flex items-center text-lg font-semibold text-gray-900 gap-2">
-          <MessageSquare className="h-5 w-5 text-indigo-600" />
-          Geospatial AI Analyst
+    <div className="flex flex-col h-full bg-gray-100 border rounded-lg shadow-inner min-w-0">
+      <header className="p-3 bg-white border-b flex justify-between items-center rounded-t-lg flex-shrink-0 min-w-0">
+        <h2 className="flex items-center text-lg font-semibold text-gray-900 gap-2 truncate">
+          <MessageSquare className="h-5 w-5 text-indigo-600 flex-shrink-0" />
+          <span className="truncate">Geospatial AI Analyst</span>
         </h2>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-xs font-medium" title={websocketConnected ? 'Connected to Server' : 'Disconnected from Server'}>
-            {websocketConnected ? <Wifi className="h-4 w-4 text-green-600" /> : <WifiOff className="h-4 w-4 text-red-500" />}
-            <span>{websocketConnected ? 'Connected' : 'Offline'}</span>
-          </div>
-        </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 space-y-4">
+      <main className="flex-1 overflow-y-auto p-4 space-y-4 min-w-0">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 pt-16">
             <Brain className="h-12 w-12 mx-auto mb-4 text-gray-300" />
             <p className="font-medium text-gray-600">Welcome to SpatialMind</p>
             <p className="text-sm">Ask a question or upload data to begin your analysis.</p>
+            {!websocketConnected && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800 text-sm">
+                ⚠️ Not connected to server. Please wait while we establish connection...
+              </div>
+            )}
           </div>
         )}
         {messages.map((msg) => <Message key={msg.id} msg={msg} />)}
+        {!websocketConnected && messages.length > 0 && (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800 text-sm">
+            ⚠️ Not connected to server. Messages may not be sent until connection is restored.
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </main>
 

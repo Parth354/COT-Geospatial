@@ -76,6 +76,8 @@ export const useAppActions = (dispatch) => {
     setResults: (results) => dispatch({ type: 'SET_RESULTS', payload: { results } }),
     /** Clears the content from the results panel by setting it to null. */
     clearResults: () => dispatch({ type: 'SET_RESULTS', payload: { results: null } }),
+    /** Toggles fullscreen mode for the map viewer. */
+    toggleMapFullscreen: () => dispatch({ type: 'TOGGLE_MAP_FULLSCREEN' }),
 
     // ===================================
     // Notification Actions

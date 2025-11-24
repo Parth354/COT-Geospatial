@@ -1,0 +1,335 @@
+{
+  "type": "FeatureCollection",
+  "name": "Test Flood Prone Areas - Delhi",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 1,
+        "name": "Yamuna River Flood Zone - North",
+        "risk_level": "High",
+        "area_km2": 2.5,
+        "population_affected": 15000,
+        "elevation_m": 210,
+        "flood_frequency": "Annual",
+        "last_flood": "2023-08-15"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2000, 28.7000],
+          [77.2200, 28.7000],
+          [77.2200, 28.7200],
+          [77.2000, 28.7200],
+          [77.2000, 28.7000]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 2,
+        "name": "Yamuna River Flood Zone - Central",
+        "risk_level": "Very High",
+        "area_km2": 3.8,
+        "population_affected": 25000,
+        "elevation_m": 205,
+        "flood_frequency": "Annual",
+        "last_flood": "2023-08-20"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2400, 28.6000],
+          [77.2600, 28.6000],
+          [77.2600, 28.6200],
+          [77.2400, 28.6200],
+          [77.2400, 28.6000]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 3,
+        "name": "Yamuna River Flood Zone - South",
+        "risk_level": "High",
+        "area_km2": 2.1,
+        "population_affected": 12000,
+        "elevation_m": 208,
+        "flood_frequency": "Biannual",
+        "last_flood": "2023-07-10"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2800, 28.5000],
+          [77.3000, 28.5000],
+          [77.3000, 28.5200],
+          [77.2800, 28.5200],
+          [77.2800, 28.5000]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 4,
+        "name": "Najafgarh Drain Flood Area",
+        "risk_level": "Medium",
+        "area_km2": 1.5,
+        "population_affected": 8000,
+        "elevation_m": 215,
+        "flood_frequency": "Occasional",
+        "last_flood": "2022-09-05"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.1000, 28.6500],
+          [77.1200, 28.6500],
+          [77.1200, 28.6700],
+          [77.1000, 28.6700],
+          [77.1000, 28.6500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 5,
+        "name": "Barapullah Drain Flood Zone",
+        "risk_level": "Medium",
+        "area_km2": 1.2,
+        "population_affected": 6000,
+        "elevation_m": 218,
+        "flood_frequency": "Occasional",
+        "last_flood": "2023-06-18"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.1800, 28.5500],
+          [77.2000, 28.5500],
+          [77.2000, 28.5700],
+          [77.1800, 28.5700],
+          [77.1800, 28.5500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 6,
+        "name": "Low-lying Area - East Delhi",
+        "risk_level": "High",
+        "area_km2": 4.2,
+        "population_affected": 30000,
+        "elevation_m": 200,
+        "flood_frequency": "Annual",
+        "last_flood": "2023-08-25"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.3200, 28.5500],
+          [77.3500, 28.5500],
+          [77.3500, 28.5800],
+          [77.3200, 28.5800],
+          [77.3200, 28.5500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 7,
+        "name": "Yamuna River Bank - Okhla",
+        "risk_level": "Very High",
+        "area_km2": 2.8,
+        "population_affected": 18000,
+        "elevation_m": 202,
+        "flood_frequency": "Annual",
+        "last_flood": "2023-08-22"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.3000, 28.4500],
+          [77.3200, 28.4500],
+          [77.3200, 28.4700],
+          [77.3000, 28.4700],
+          [77.3000, 28.4500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 8,
+        "name": "Drainage Basin - West Delhi",
+        "risk_level": "Low",
+        "area_km2": 0.8,
+        "population_affected": 3000,
+        "elevation_m": 225,
+        "flood_frequency": "Rare",
+        "last_flood": "2021-07-12"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.0500, 28.6000],
+          [77.0700, 28.6000],
+          [77.0700, 28.6200],
+          [77.0500, 28.6200],
+          [77.0500, 28.6000]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 9,
+        "name": "Yamuna Floodplain - Wazirabad",
+        "risk_level": "High",
+        "area_km2": 3.5,
+        "population_affected": 20000,
+        "elevation_m": 207,
+        "flood_frequency": "Annual",
+        "last_flood": "2023-08-18"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2200, 28.7500],
+          [77.2500, 28.7500],
+          [77.2500, 28.7800],
+          [77.2200, 28.7800],
+          [77.2200, 28.7500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 10,
+        "name": "Urban Flood Zone - Central Delhi",
+        "risk_level": "Medium",
+        "area_km2": 1.8,
+        "population_affected": 10000,
+        "elevation_m": 212,
+        "flood_frequency": "Occasional",
+        "last_flood": "2023-07-28"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2000, 28.6300],
+          [77.2200, 28.6300],
+          [77.2200, 28.6500],
+          [77.2000, 28.6500],
+          [77.2000, 28.6300]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 11,
+        "name": "Yamuna River Monitoring Point 1",
+        "risk_level": "High",
+        "area_km2": 0,
+        "population_affected": 0,
+        "elevation_m": 210,
+        "flood_frequency": "Annual",
+        "last_flood": "2023-08-15",
+        "monitoring_station": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2100, 28.7100]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 12,
+        "name": "Yamuna River Monitoring Point 2",
+        "risk_level": "Very High",
+        "area_km2": 0,
+        "population_affected": 0,
+        "elevation_m": 205,
+        "flood_frequency": "Annual",
+        "last_flood": "2023-08-20",
+        "monitoring_station": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2500, 28.6100]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 13,
+        "name": "Yamuna River Monitoring Point 3",
+        "risk_level": "High",
+        "area_km2": 0,
+        "population_affected": 0,
+        "elevation_m": 208,
+        "flood_frequency": "Biannual",
+        "last_flood": "2023-07-10",
+        "monitoring_station": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2900, 28.5100]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 14,
+        "name": "Flood Evacuation Center 1",
+        "risk_level": "Safe",
+        "area_km2": 0,
+        "population_affected": 0,
+        "elevation_m": 230,
+        "flood_frequency": "None",
+        "last_flood": "Never",
+        "evacuation_center": true,
+        "capacity": 5000
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.1500, 28.6800]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 15,
+        "name": "Flood Evacuation Center 2",
+        "risk_level": "Safe",
+        "area_km2": 0,
+        "population_affected": 0,
+        "elevation_m": 235,
+        "flood_frequency": "None",
+        "last_flood": "Never",
+        "evacuation_center": true,
+        "capacity": 8000
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2700, 28.5600]
+      }
+    }
+  ]
+}
+

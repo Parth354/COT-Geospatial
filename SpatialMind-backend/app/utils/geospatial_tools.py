@@ -40,11 +40,14 @@ def filter_by_attribute(input_layer: gpd.GeoDataFrame, query_string: str) -> gpd
     """
     Selects features from a layer based on a query on its attribute data. Use for tasks like selecting
     roads where `type` == 'highway' or cities where `population` > 1 million. The query uses
-    standard Pandas query syntax. Column names with spaces must be wrapped in backticks.
+    standard Pandas query syntax. Column names with spaces or special characters must be wrapped in backticks.
+    
+    IMPORTANT: Column names in the query string should be wrapped in backticks to avoid evaluation errors.
+    Example: "`population_density` > 20000" or "`elevation_m` < 210"
 
     Args:
         input_layer (GeoDataFrame): The in-memory layer to filter.
-        query_string (str): A pandas-style query string (e.g., "`property value` > 500000").
+        query_string (str): A pandas-style query string (e.g., "`property value` > 500000" or "`population_density` > 20000").
 
     Returns:
         A new GeoDataFrame containing only the features that match the query string.
@@ -52,12 +55,79 @@ def filter_by_attribute(input_layer: gpd.GeoDataFrame, query_string: str) -> gpd
     logger.info(f"Filtering layer with attribute query: '{query_string}'")
     if input_layer.empty:
         return input_layer.copy()
+    
+    import re
+    attr_cols = [col for col in input_layer.columns if col != 'geometry']
+    
+    # Extract column names from query_string that might need wrapping
+    # Find all potential column names (words that aren't operators, numbers, or in quotes/backticks)
+    processed_query = query_string
+    
+    # First, identify all column names mentioned in the query
+    # Pattern: word characters and underscores, not already in backticks or quotes
+    # This regex finds identifiers that could be column names
+    potential_columns = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', query_string)
+    
+    # Wrap each potential column name in backticks if:
+    # 1. It exists in the actual columns
+    # 2. It's not already wrapped in backticks
+    # 3. It's not a Python keyword or operator
+    python_keywords = {'and', 'or', 'not', 'in', 'is', 'True', 'False', 'None', 'if', 'else'}
+    operators = {'gt', 'lt', 'ge', 'le', 'eq', 'ne'}
+    
+    for col_name in set(potential_columns):
+        if col_name in python_keywords or col_name in operators:
+            continue
+        if col_name in attr_cols:
+            # Check if already wrapped
+            if f'`{col_name}`' not in processed_query:
+                # Use word boundary to avoid partial matches
+                pattern = r'\b' + re.escape(col_name) + r'\b'
+                processed_query = re.sub(pattern, f'`{col_name}`', processed_query)
+        else:
+            # Column doesn't exist - check for similar column names
+            similar_cols = [c for c in attr_cols if col_name.lower() in c.lower() or c.lower() in col_name.lower()]
+            if similar_cols:
+                raise ValueError(
+                    f"Column '{col_name}' not found in layer. "
+                    f"Did you mean one of these? {similar_cols}. "
+                    f"Available columns: {attr_cols}"
+                )
+    
+    # Validate that at least one column from the layer is referenced
+    found_cols = [col for col in attr_cols if f'`{col}`' in processed_query or col in query_string]
+    if not found_cols:
+        raise ValueError(
+            f"No valid column names found in query. "
+            f"Query: '{query_string}'. "
+            f"Available columns: {attr_cols}"
+        )
+    
     try:
-        filtered_gdf = input_layer.query(query_string, engine='python')
+        logger.info(f"Executing processed query: '{processed_query}'")
+        filtered_gdf = input_layer.query(processed_query, engine='python')
         logger.info(f"Filter applied. Original: {len(input_layer)}, Filtered: {len(filtered_gdf)}")
         return filtered_gdf
     except Exception as e:
-        raise ValueError(f"Attribute filter query failed: {e}")
+        error_msg = str(e)
+        # Check if it's a NameError about undefined variable
+        if "not defined" in error_msg or "NameError" in error_msg:
+            # Extract the undefined name
+            undefined_match = re.search(r"name '(\w+)' is not defined", error_msg)
+            if undefined_match:
+                undefined_name = undefined_match.group(1)
+                similar_cols = [c for c in attr_cols if undefined_name.lower() in c.lower() or c.lower() in undefined_name.lower()]
+                raise ValueError(
+                    f"Column '{undefined_name}' not found in layer. "
+                    f"{f'Did you mean one of these? {similar_cols}. ' if similar_cols else ''}"
+                    f"Available columns: {attr_cols}. "
+                    f"Original query: '{query_string}'"
+                )
+        raise ValueError(
+            f"Attribute filter query failed: {error_msg}. "
+            f"Query: '{processed_query}'. "
+            f"Available columns: {attr_cols}"
+        )
 
 
 def buffer_layer(input_layer: gpd.GeoDataFrame, distance_meters: float) -> gpd.GeoDataFrame:
@@ -213,3 +283,46 @@ def log_message(message: str) -> str:
     """
     logger.info(f"Logging message: '{message}'")
     return message
+
+
+def inspect_layer_properties(input_layer: gpd.GeoDataFrame) -> str:
+    """
+    Inspects a layer and returns a detailed summary of its properties, attributes, and characteristics.
+    Use this to understand what data is available in a layer before performing analysis. This helps
+    you understand the data structure, attribute columns, geographic extent, and feature count.
+    
+    Args:
+        input_layer (GeoDataFrame): The layer to inspect.
+        
+    Returns:
+        A detailed string summary including: feature count, geometry types, attribute columns,
+        geographic bounds, CRS, and sample attribute values.
+    """
+    logger.info("Inspecting layer properties.")
+    if input_layer.empty:
+        return "Layer is empty - no features to inspect."
+    
+    info_parts = []
+    info_parts.append(f"**Layer Summary:**")
+    info_parts.append(f"- Total features: {len(input_layer)}")
+    info_parts.append(f"- Geometry type(s): {input_layer.geom_type.unique().tolist()}")
+    info_parts.append(f"- Coordinate Reference System: {input_layer.crs}")
+    
+    # Geographic bounds
+    bounds = input_layer.total_bounds
+    info_parts.append(f"- Geographic extent: West={bounds[0]:.4f}, South={bounds[1]:.4f}, East={bounds[2]:.4f}, North={bounds[3]:.4f}")
+    
+    # Attribute columns
+    attr_cols = [col for col in input_layer.columns if col != 'geometry']
+    if attr_cols:
+        info_parts.append(f"- Attribute columns ({len(attr_cols)}): {', '.join(attr_cols)}")
+        
+        # Sample values for each column
+        info_parts.append(f"\n**Sample Attribute Values (first 3 features):**")
+        for col in attr_cols[:10]:  # Limit to first 10 columns
+            sample_vals = input_layer[col].head(3).tolist()
+            info_parts.append(f"  - {col}: {sample_vals}")
+    else:
+        info_parts.append("- No attribute columns (geometry only)")
+    
+    return "\n".join(info_parts)

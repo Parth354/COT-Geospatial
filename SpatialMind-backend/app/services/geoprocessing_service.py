@@ -63,7 +63,23 @@ class ToolExecutor:
         """Generates a formatted string of all tool descriptions for the LLM's prompt."""
         docs = []
         for name, data in self.tool_docstrings.items():
-            docs.append(f"- Tool: `{name}`\n{data['description']}\n")
+            tool_func = self.tools.get(name)
+            description = data['description']
+            
+            # Check if tool returns GeoDataFrame (produces a new layer)
+            if tool_func and name != 'load_data':  # load_data already has output_name in its signature
+                import inspect
+                try:
+                    sig = inspect.signature(tool_func)
+                    return_annotation = sig.return_annotation
+                    # Check if return type is GeoDataFrame
+                    if 'GeoDataFrame' in str(return_annotation):
+                        # Add note about output_name requirement
+                        description += "\n\n**IMPORTANT**: This tool returns a new GeoDataFrame. You MUST include an 'output_name' argument in the args to store the result (e.g., {\"input_layer\": \"layer_name\", \"output_name\": \"new_layer_name\"})."
+                except Exception:
+                    pass  # If we can't inspect, skip the annotation
+            
+            docs.append(f"- Tool: `{name}`\n{description}\n")
         return "".join(docs)
 
     def load_data(self, asset_id: str, output_name: str) -> str:
@@ -99,11 +115,22 @@ class ToolExecutor:
         if tool_name not in self.tools:
             return f"Error: Tool '{tool_name}' not found. Available tools: {list(self.tools.keys())}"
         
-        # Step 1: Resolve arguments. If an argument's value is a string that matches a key
+        # Step 1: Extract 'output_name' if present (for tools that produce GeoDataFrames)
+        # This is a special argument that tells us where to store the result.
+        # NOTE: load_data is special - it REQUIRES output_name as a parameter, so we must pass it through.
+        output_name = args.get("output_name")
+        
+        # Step 2: Resolve arguments. If an argument's value is a string that matches a key
         # in our state, replace the string with the actual GeoDataFrame from the state.
+        # For most tools, exclude 'output_name' from resolved_args since they don't accept it.
+        # But load_data is an exception - it needs output_name as a parameter.
         resolved_args = {}
         try:
             for key, value in args.items():
+                # Special handling: load_data needs output_name, other tools don't
+                if key == "output_name" and tool_name != "load_data":
+                    continue  # Skip output_name for tools other than load_data
+                
                 if isinstance(value, str) and value in self.state:
                     resolved_args[key] = self.state[value]
                 else:
@@ -116,16 +143,17 @@ class ToolExecutor:
         try:
             logger.info(f"Executing tool '{tool_name}' with args: {list(resolved_args.keys())}")
 
-            # Step 2: Call the appropriate tool function with the resolved arguments.
+            # Step 3: Call the appropriate tool function with the resolved arguments.
             result = self.tools[tool_name](**resolved_args)
 
-            # Step 3: Handle the result based on what the tool returns.
+            # Step 4: Handle the result based on what the tool returns.
             if isinstance(result, gpd.GeoDataFrame):
                 # If the tool returned a GeoDataFrame, it's a "productive" tool.
-                # We need the 'output_name' from the original arguments to save it to state.
-                output_name = args.get("output_name")
+                # We need an 'output_name' to save it to state.
                 if not output_name:
-                    return f"Error: Tool '{tool_name}' produced a layer but was called without an 'output_name' argument."
+                    # Generate a default output name if not provided
+                    output_name = f"{tool_name}_result_{len(self.state)}"
+                    logger.warning(f"Tool '{tool_name}' produced a layer but no 'output_name' was provided. Using default: '{output_name}'")
                 
                 self.state[output_name] = result
                 return f"Success: Tool '{tool_name}' created layer '{output_name}' with {len(result)} features."

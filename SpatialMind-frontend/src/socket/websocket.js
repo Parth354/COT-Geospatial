@@ -18,7 +18,8 @@ class WebSocketService {
     if (this.socket || this.isConnecting) return;
     
     this.isConnecting = true;
-    const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    // Use the same API URL logic as api.js - default to localhost:8000
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     const wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws';
     console.log(`[WS Service] Initializing connection to: ${wsUrl}`);
 
@@ -35,30 +36,59 @@ class WebSocketService {
 
     this.socket.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data);
+        let message;
         
-        if (message.type === 'ping') {
-          this.safeSend({ type: 'pong' });
+        // FastAPI WebSocket sends JSON strings, so we need to parse them
+        if (typeof event.data === 'string') {
+          message = JSON.parse(event.data);
+        } else if (event.data instanceof Blob) {
+          // Handle Blob if needed
+          event.data.text().then(text => {
+            try {
+              const parsed = JSON.parse(text);
+              this._handleParsedMessage(parsed);
+            } catch (e) {
+              console.error('[WS Service] Failed to parse Blob message:', e);
+            }
+          });
           return;
+        } else {
+          message = event.data;
         }
-
-        const { type, ...payload } = message;
-
-        if (!type) {
-          console.warn('[WS Service] Received message without a type:', message);
-          return;
-        }
-
-        const formattedAction = {
-          type: type.toUpperCase(),
-          payload: payload 
-        };
-
-        this.dispatcher(formattedAction);
-
+        
+        this._handleParsedMessage(message);
       } catch (err) {
-        console.error('[WS Service] Failed to parse or process server message:', err);
+        console.error('[WS Service] Failed to parse or process server message:', err, 'Raw data:', event.data);
       }
+    };
+    
+    this._handleParsedMessage = (message) => {
+      console.log('[WS Service] Received message:', message);
+      
+      if (!message || typeof message !== 'object') {
+        console.warn('[WS Service] Invalid message format:', message);
+        return;
+      }
+      
+      if (message.type === 'ping') {
+        this.safeSend({ type: 'pong' });
+        return;
+      }
+
+      const { type, ...payload } = message;
+
+      if (!type) {
+        console.warn('[WS Service] Received message without a type:', message);
+        return;
+      }
+
+      const formattedAction = {
+        type: type.toUpperCase(),
+        payload: payload 
+      };
+
+      console.log('[WS Service] Dispatching action:', formattedAction);
+      this.dispatcher(formattedAction);
     };
 
     this.socket.onerror = (error) => {
@@ -90,9 +120,32 @@ class WebSocketService {
     if (typeof dispatchFn === 'function') {
       this.dispatcher = dispatchFn;
       console.log('[WS Service] Dispatcher registered successfully.');
+      
+      // Check current socket state and update accordingly
+      if (this.socket) {
+        if (this.socket.readyState === WebSocket.OPEN) {
+          console.log('[WS Service] Socket already connected, updating state.');
+          this.dispatcher({ type: 'SET_WEBSOCKET_CONNECTED', payload: true });
+        } else if (this.socket.readyState === WebSocket.CONNECTING) {
+          console.log('[WS Service] Socket is connecting, waiting...');
+        } else {
+          console.log('[WS Service] Socket exists but not open, state:', this.socket.readyState);
+          this.dispatcher({ type: 'SET_WEBSOCKET_CONNECTED', payload: false });
+        }
+      } else if (!this.isConnecting) {
+        // If no connection attempt is in progress, start one
+        console.log('[WS Service] No connection found, initiating connection.');
+        this._internalConnect();
+      }
     } else {
        console.error("[WS Service] Attempted to register a non-function dispatcher.");
     }
+  }
+  
+  // Public method to check connection status
+  getConnectionStatus() {
+    if (!this.socket) return false;
+    return this.socket.readyState === WebSocket.OPEN;
   }
 
   unregisterDispatcher() {
@@ -129,5 +182,6 @@ class WebSocketService {
   }
 }
 const webSocketService = new WebSocketService();
-webSocketService._internalConnect();
+// Don't connect immediately - wait for dispatcher to be registered
+// webSocketService._internalConnect();
 export default webSocketService;

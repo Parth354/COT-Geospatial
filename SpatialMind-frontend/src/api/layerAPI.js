@@ -2,7 +2,7 @@ import { api} from './api.js';
 import webSocketService from '../socket/websocket.js';
 
 export const layerAPI = {
-  ingestDataset: async (datasetId, onStatusUpdate) => {
+  ingestDataset: async (datasetId, actions) => {
     try {
       if (!datasetId) throw new Error('Dataset ID is required to start ingestion.');
 
@@ -11,28 +11,25 @@ export const layerAPI = {
 
       const { task_id, status, message } = response.data;
 
+      if (!task_id) {
+        console.warn('⚠️ No task_id returned from ingestion endpoint. Status:', status);
+        // If already processed, update the dataset status in the frontend
+        if (status === 'processed' && actions) {
+          actions.updateDatasetStatus(datasetId, 'processed');
+        }
+        return { taskId: null, message, status };
+      }
+
       console.log(`🗂️ Ingestion triggered. Task ID: ${task_id}, Status: ${status}`);
 
-      // Subscribe to WebSocket job updates
+      // Subscribe to WebSocket job updates using task_id
       webSocketService.subscribe(task_id);
+      
+      // Also subscribe to dataset_id for backward compatibility
+      webSocketService.subscribe(datasetId);
 
-      const handleWSUpdate = (action) => {
-        if (action.type === 'TASK_UPDATE' && action.payload.job_id === task_id) {
-          console.log(`📡 WebSocket Update:`, action.payload);
-
-          if (typeof onStatusUpdate === 'function') {
-            onStatusUpdate(action.payload);
-          }
-
-          if (action.payload.status === 'ingested' || action.payload.status === 'failed') {
-            webSocketService.unsubscribe(task_id);
-            webSocketService.unregisterDispatcher();
-          }
-        }
-      };
-
-      // Register temporary dispatcher for this task
-      webSocketService.registerDispatcher(handleWSUpdate);
+      // The central dispatcher in App.jsx will handle INGESTION_COMPLETE messages
+      // No need to register a temporary dispatcher - it will break the main one
 
       return { taskId: task_id, message, status };
     } catch (err) {
@@ -57,26 +54,33 @@ export const layerAPI = {
         params.append('zoom', options.zoom);
       }
 
+      const queryString = params.toString();
+      const url = `/api/layers/${layerId}/data${queryString ? `?${queryString}` : ''}`;
+      
       console.log(`🗺️ Fetching layer data for ${layerId} with params:`, Object.fromEntries(params));
 
-      const response = await api.get(`/api/layers/${layerId}/data`);
+      const response = await api.get(url);
 
       console.log(`✅ Layer data fetched for ${layerId}:`, {
         featureCount: response.data?.features?.length || 0,
         type: response.data?.type,
       });
 
-      return response.data;
+      // Return empty FeatureCollection if no features (instead of throwing error)
+      return response.data || { type: 'FeatureCollection', features: [] };
     } catch (err) {
       console.error(`❌ Failed to fetch layer data for ${layerId}:`, err);
 
+      // Return empty collection instead of throwing for 404 (layer might not have features in current view)
       if (err.response?.status === 404) {
-        throw new Error(`Layer '${layerId}' not found or not yet processed. Please wait or try reloading.`);
+        console.warn(`Layer ${layerId} returned 404, returning empty collection`);
+        return { type: 'FeatureCollection', features: [] };
       } else if (err.response?.status === 500) {
         throw new Error(`Server error while fetching layer data. Try again later.`);
       }
 
-      throw err;
+      // For other errors, return empty collection to prevent map crashes
+      return { type: 'FeatureCollection', features: [] };
     }
   }
 };

@@ -30,6 +30,38 @@ def list_layers(request: Request, db: Session = Depends(get_db)):
         "data_url": str(request.url_for('get_layer_data', layer_id=layer.layer_id))
     } for layer in layers_query]
 
+@router.get("/{layer_id}/debug")
+def debug_layer_data(layer_id: str, db: Session = Depends(get_db)):
+    """Debug endpoint to check what's in the database for a dataset"""
+    from app.models.dataset import Dataset
+    
+    dataset = db.query(Dataset).filter(Dataset.dataset_id == layer_id).first()
+    if not dataset:
+        return {"error": f"Dataset {layer_id} not found"}
+    
+    # Count layers
+    layer_count = db.query(Layer).filter(Layer.dataset_id == layer_id).count()
+    
+    # Get sample records
+    sample_layers = db.query(Layer).filter(Layer.dataset_id == layer_id).limit(5).all()
+    
+    return {
+        "dataset_id": layer_id,
+        "dataset_name": dataset.name,
+        "dataset_status": dataset.status,
+        "geojson_path": dataset.geojson_path,
+        "total_layer_records": layer_count,
+        "sample_layers": [
+            {
+                "layer_id": l.layer_id,
+                "name": l.name,
+                "has_geometry": l.geom is not None,
+                "properties_keys": list(l.properties.keys()) if l.properties else []
+            }
+            for l in sample_layers
+        ]
+    }
+
 @router.get("/{layer_id}/data")
 def get_layer_data(
     layer_id: str,
@@ -52,13 +84,36 @@ def get_layer_data(
             raise HTTPException(status_code=400, detail="Invalid bbox format. Use 'west,south,east,north'.")
 
     logger.info(f"API: Fetching layer data for layer_id: {layer_id}")
+    
+    # First verify dataset exists and check its status
+    from app.models.dataset import Dataset
+    dataset = db.query(Dataset).filter(Dataset.dataset_id == layer_id).first()
+    if dataset:
+        logger.info(f"Dataset found: {dataset.name}, status: {dataset.status}, geojson_path: {dataset.geojson_path}")
+        
+        # Check if dataset has been ingested
+        layer_count = db.query(Layer).filter(Layer.dataset_id == layer_id).count()
+        logger.info(f"Layer records in database for this dataset: {layer_count}")
+        
+        if layer_count == 0 and dataset.status == 'processed':
+            logger.warning(f"Dataset status is 'processed' but no layer records found. Ingestion may have failed silently.")
+        elif layer_count == 0 and dataset.status != 'processed':
+            logger.info(f"Dataset not yet processed (status: {dataset.status}). No layer data available yet.")
+    else:
+        logger.warning(f"Dataset with id '{layer_id}' not found in database")
+    
     geojson = LayerService.get_layer_data(db, layer_id, bbox_vals, zoom)
 
-    if not geojson or not geojson.get("features"):
-        logger.warning(f"API: No features found for layer_id: {layer_id}")
-        raise HTTPException(status_code=404, detail=f"Layer with ID '{layer_id}' not found or has no features in this view.")
+    # Return empty FeatureCollection instead of 404 if no features found
+    # This allows the map to render without errors and handle empty layers gracefully
+    if not geojson:
+        logger.warning(f"API: LayerService returned None for layer_id: {layer_id}")
+        geojson = {"type": "FeatureCollection", "features": []}
+    elif not geojson.get("features"):
+        logger.info(f"API: No features found for layer_id: {layer_id} in current view, returning empty collection")
+        geojson = {"type": "FeatureCollection", "features": []}
 
-    logger.info(f"API: Successfully fetched data for layer_id: {layer_id}")
+    logger.info(f"API: Successfully fetched data for layer_id: {layer_id} ({len(geojson.get('features', []))} features)")
     return geojson
 
 @router.post("/ingest/{dataset_id}", status_code=status.HTTP_202_ACCEPTED)

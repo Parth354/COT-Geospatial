@@ -23,10 +23,8 @@ def get_llm(model_type: str = "gemini"):
             raise ValueError("GOOGLE_API_KEY must be configured for the Gemini model.")
         
         try:
-            # ✅ FIX: This ensures we are creating and returning the LangChain wrapper object.
-            # The agent expects this specific object because it uses the standard `.invoke()` method.
             llm_instance = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash",
                 google_api_key=settings.GOOGLE_API_KEY,
                 temperature=0.0,
                 convert_system_message_to_human=True

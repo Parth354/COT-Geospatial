@@ -50,6 +50,9 @@ export function uiReducer(state, action) {
       
     case 'SET_RESULTS':
       return { ...state, results: action.payload.results };
+
+    case 'TOGGLE_MAP_FULLSCREEN':
+      return { ...state, mapFullscreen: !state.mapFullscreen };
         
     default:
       return state;

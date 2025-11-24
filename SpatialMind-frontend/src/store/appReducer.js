@@ -38,5 +38,33 @@ export function appReducer(state, action) {
     state
   );
   
+  // Handle pending dataset status updates from ingestion
+  if (nextState._pendingDatasetUpdate) {
+    const { datasetId, status } = nextState._pendingDatasetUpdate;
+    const updatedState = uiReducer(nextState, {
+      type: 'UPDATE_DATASET_STATUS',
+      payload: { datasetId, status }
+    });
+    delete updatedState._pendingDatasetUpdate;
+    return updatedState;
+  }
+  
+  // Handle pending layers to add from job_complete
+  if (nextState._pendingLayersToAdd && nextState._pendingLayersToAdd.length > 0) {
+    const layers = nextState._pendingLayersToAdd;
+    let updatedState = { ...nextState };
+    delete updatedState._pendingLayersToAdd;
+    
+    // Add each layer to the map
+    layers.forEach(layer => {
+      updatedState = uiReducer(updatedState, {
+        type: 'ADD_MAP_LAYER',
+        payload: { layer }
+      });
+    });
+    
+    return updatedState;
+  }
+  
   return nextState;
 }

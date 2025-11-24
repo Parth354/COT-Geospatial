@@ -2,7 +2,6 @@ import React from 'react';
 import { BrainCircuit, Settings, Layers, Cloud } from 'lucide-react';
 import { useAppContext } from '../hooks/AppContext';
 import AgentStatus from './AgentStatus.jsx';
-import ConnectionStatus from './ConnectionStatus.jsx';
 
 
 
@@ -29,7 +28,6 @@ function Layout({ children }) {
           </div>
           <div className="flex items-center space-x-4">
             <AgentStatus />
-            <ConnectionStatus />
             <button
               className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
               onClick={handleSettingsClick}

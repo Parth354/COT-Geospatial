@@ -17,4 +17,5 @@ export const initialState = {
   mapCenter: [20.5937, 78.9629],
   mapZoom: 5,
   mapFitBounds: null,
+  mapFullscreen: false,
 };

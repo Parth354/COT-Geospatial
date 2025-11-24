@@ -20,8 +20,18 @@ const WebSocketManager = () => {
   useEffect(() => {
     console.log("WebSocketManager: Registering central dispatcher with WebSocket service.");
     webSocketService.registerDispatcher(dispatch);
+    
+    // Check connection status after a short delay to ensure state is synced
+    // This handles the case where the socket connected before the dispatcher was registered
+    const checkConnection = setTimeout(() => {
+      const isConnected = webSocketService.getConnectionStatus();
+      console.log(`[WebSocketManager] Initial connection check: ${isConnected}`);
+      // Always dispatch - the reducer will handle it efficiently
+      dispatch({ type: 'SET_WEBSOCKET_CONNECTED', payload: isConnected });
+    }, 500);
 
     return () => {
+      clearTimeout(checkConnection);
       console.log("WebSocketManager: Unregistering dispatcher.");
       webSocketService.unregisterDispatcher();
     };

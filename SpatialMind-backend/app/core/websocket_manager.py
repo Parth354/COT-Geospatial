@@ -118,10 +118,16 @@ class WebSocketManager:
                         try:
                             channel = message['channel']
                             job_id = channel.split(':', 1)[1]
-                            data = json.loads(message['data'])
+                            # message['data'] is already a string (from Redis with decode_responses=True)
+                            # If it's already a dict, use it directly; otherwise parse it
+                            if isinstance(message['data'], str):
+                                data = json.loads(message['data'])
+                            else:
+                                data = message['data']
+                            logger.debug(f"Parsed Redis message for job '{job_id}': {data}")
                             await self.message_queue.put((job_id, data))
-                        except (IndexError, json.JSONDecodeError) as e:
-                            logger.error(f"Could not parse Redis pub/sub message: {message}. Error: {e}")
+                        except (IndexError, json.JSONDecodeError, TypeError) as e:
+                            logger.error(f"Could not parse Redis pub/sub message: {message}. Error: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Redis subscriber task failed critically: {e}", exc_info=True)
             self.pubsub_task = None # Allow the task to be restarted if it dies

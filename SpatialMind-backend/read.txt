@@ -37,8 +37,9 @@ SpatialMind Backend – Quick Start
 5. Required Background Services
    - Redis (Upstash): no process to run locally, just ensure the URL is reachable. The app now reads the full URL for both sync/async Redis clients, so TLS endpoints work out of the box.
    - Celery worker (executes ingestion + agent jobs):
-       celery -A app.core.celery_app.celery_app worker -l info -Q celery -P solo
-     `-P solo` avoids multiprocessing issues on Windows. Keep this terminal open.
+       celery -A app.core.celery_app.celery_app worker -l info -Q celery
+     Note: The configuration automatically uses 'solo' pool on Windows. On Linux/Mac, it uses 'prefork'.
+     Keep this terminal open while the backend is running.
 
 6. Launch the FastAPI Server
    - From `SpatialMind-backend/`:

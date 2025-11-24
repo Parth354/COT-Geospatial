@@ -16,36 +16,61 @@ const DynamicGeoJSONLayer = React.memo(({ layer }) => {
   const [geojsonData, setGeojsonData] = useState({ type: 'FeatureCollection', features: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [hasLoadedStatic, setHasLoadedStatic] = useState(false);
+
+  const isStaticLayer = layer.type === 'analysis_result' && layer.dataUrl;
 
   const fetchData = useCallback(debounce(async () => {
+    // For static layers, only fetch once
+    if (isStaticLayer && hasLoadedStatic) {
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
-      const bounds = map.getBounds();
-      const zoom = map.getZoom();
-      const data = await layerAPI.fetchLayerData(layer.layerId, {
-        bbox: { west: bounds.getWest(), south: bounds.getSouth(), east: bounds.getEast(), north: bounds.getNorth() },
-        zoom: zoom
-      });
-      setGeojsonData(data);
-    } catch (err) {
-      if (err.message && (err.message.includes('404') || err.message.toLowerCase().includes('not found'))) {
-        setGeojsonData({ type: 'FeatureCollection', features: [] });
-        console.warn(`Layer ${layer.layerId} has no features in the current view (404).`);
+      // Check if this is an analysis result layer with a static file URL
+      if (isStaticLayer) {
+        // Fetch directly from static file URL
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const fullUrl = layer.dataUrl.startsWith('http') ? layer.dataUrl : `${baseUrl}${layer.dataUrl}`;
+        const response = await fetch(fullUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch static layer: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setGeojsonData(data);
+        setHasLoadedStatic(true);
       } else {
-        console.error(`Failed to fetch data for layer ${layer.layerId}:`, err);
+        // Regular layer - fetch via API with bbox/zoom
+        const bounds = map.getBounds();
+        const zoom = map.getZoom();
+        const data = await layerAPI.fetchLayerData(layer.layerId, {
+          bbox: { west: bounds.getWest(), south: bounds.getSouth(), east: bounds.getEast(), north: bounds.getNorth() },
+          zoom: zoom
+        });
+        setGeojsonData(data);
+      }
+    } catch (err) {
+      // layerAPI.fetchLayerData now returns empty collection instead of throwing
+      // But handle any unexpected errors gracefully
+      console.error(`Failed to fetch data for layer ${layer.layerId}:`, err);
+      setGeojsonData({ type: 'FeatureCollection', features: [] });
+      // Don't set error state for empty layers - they're valid
+      if (err.message && !err.message.includes('404') && !err.message.toLowerCase().includes('not found')) {
         setError('Failed to load layer data.');
       }
     } finally {
       setIsLoading(false);
     }
-  }, 300), [map, layer.layerId]);
-
-  useMapEvents({ moveend: fetchData, zoomend: fetchData });
+  }, 300), [map, layer.layerId, layer.type, layer.dataUrl, isStaticLayer, hasLoadedStatic]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Subscribe to map events - fetchData will skip if it's a static layer that's already loaded
+  useMapEvents({ moveend: fetchData, zoomend: fetchData });
 
   const onEachFeature = (feature, layerInstance) => {
     if (feature.properties) {
