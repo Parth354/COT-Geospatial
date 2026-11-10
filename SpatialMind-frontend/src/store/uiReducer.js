@@ -53,6 +53,9 @@ export function uiReducer(state, action) {
 
     case 'TOGGLE_MAP_FULLSCREEN':
       return { ...state, mapFullscreen: !state.mapFullscreen };
+
+    case 'SET_SETTINGS_OPEN':
+      return { ...state, isSettingsOpen: Boolean(action.payload) };
         
     default:
       return state;

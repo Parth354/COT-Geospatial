@@ -145,26 +145,40 @@ async def trigger_layer_ingestion(dataset_id: str, db: Session = Depends(get_db)
     db.commit()
     logger.info(f"API: Dataset '{dataset_id}' status updated to 'ingesting' successfully.")
 
-    # Dispatch the task
-    try:
-        logger.info(f"API: Dispatching Celery task for dataset '{dataset_id}'.")
-        task_result = celery_app.send_task(
-           "app.tasks.ingest_dataset.ingest_dataset_into_layer",
-            args=[dataset_id],
-            queue="celery"
-        )
-        logger.info(f"API: Celery task {task_result.id} dispatched successfully for dataset '{dataset_id}'.")
+    def is_celery_worker_active() -> bool:
+        try:
+            inspector = celery_app.control.inspect(timeout=0.3)
+            return bool(inspector.ping()) if inspector else False
+        except Exception:
+            return False
 
-        return {
-            "message": "Layer ingestion task has been dispatched to Celery.",
-            "dataset_id": dataset_id,
-            "status": "ingesting",
-            "task_id": task_result.id
-        }
+    if is_celery_worker_active():
+        try:
+            logger.info(f"API: Dispatching Celery task for dataset '{dataset_id}'.")
+            task_result = celery_app.send_task(
+               "app.tasks.ingest_dataset.ingest_dataset_into_layer",
+                args=[dataset_id],
+                queue="celery"
+            )
+            return {
+                "message": "Layer ingestion task dispatched to active Celery worker.",
+                "dataset_id": dataset_id,
+                "status": "ingesting",
+                "task_id": task_result.id
+            }
+        except Exception as e:
+            logger.warning(f"Celery dispatch failed: {e}")
 
-    except Exception as e:
-        logger.error(f"API: Failed to dispatch Celery task for dataset '{dataset_id}': {e}", exc_info=True)
-        logger.info(f"API: Reverting dataset '{dataset_id}' status to 'uploaded'.")
-        dataset.status = 'uploaded'
-        db.commit()
-        raise HTTPException(status_code=500, detail=f"Failed to dispatch ingestion task: {str(e)}")
+    # Direct background thread execution
+    import threading
+    from app.services.layer_ingestion_service import ingest_dataset_into_layer
+    logger.info(f"API: Running ingestion in immediate background thread for '{dataset_id}'.")
+    thread = threading.Thread(target=ingest_dataset_into_layer, args=(dataset_id,))
+    thread.daemon = True
+    thread.start()
+    return {
+        "message": "Layer ingestion started in background thread.",
+        "dataset_id": dataset_id,
+        "status": "ingesting",
+        "task_id": "thread-ingest"
+    }

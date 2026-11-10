@@ -10,7 +10,7 @@ from app.models.database import SessionLocal
 from app.models.dataset import Dataset 
 from app.models.layer import Layer 
 from app.models.result import Result
-from app.core.config import settings
+from app.core.config import settings, BACKEND_ROOT
 
 # Setup logger for this service
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 REQUIRED_SHP_COMPONENTS = [".shp", ".shx", ".dbf", ".prj", ".cpg", ".sbn", ".sbx"]
 BASE_UPLOAD_PATH = Path(settings.UPLOAD_DIR).resolve()
 
-# NEW constant for system-wide base layers
-BASE_SYSTEM_FILES_PATH = Path("./app/llm/knowledge_base/system_files").resolve()
+# Absolute path for system-wide base layers
+BASE_SYSTEM_FILES_PATH = (BACKEND_ROOT / "app" / "llm" / "knowledge_base" / "system_files").resolve()
 
 class JobDataService:
     """

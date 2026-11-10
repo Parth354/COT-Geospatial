@@ -19,8 +19,9 @@ class WebSocketService {
     
     this.isConnecting = true;
     // Use the same API URL logic as api.js - default to localhost:8000
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws';
+    const rawUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    const baseUrl = rawUrl.replace('//localhost:', '//127.0.0.1:');
+    const wsUrl = import.meta.env.VITE_WS_URL || (baseUrl.replace(/^http/, 'ws') + '/ws');
     console.log(`[WS Service] Initializing connection to: ${wsUrl}`);
 
     this.socket = new WebSocket(wsUrl);

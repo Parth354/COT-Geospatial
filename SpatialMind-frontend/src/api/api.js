@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -15,7 +15,7 @@ export const api = axios.create({
 // --- Axios Interceptors for Global Logging and Error Normalization ---
 api.interceptors.request.use(
   (config) => {
-    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => Promise.reject(error)
@@ -23,11 +23,11 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+    console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
     return response;
   },
   (error) => {
-    console.error('❌ API Response Error:', {
+    console.error('[API Error]', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,

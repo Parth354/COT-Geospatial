@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 import shutil
@@ -55,10 +56,9 @@ class FileService:
                 shutil.copyfileobj(file.file, buffer)
             
             # Stage 2: Process the staged file (e.g., unzip)
-            # The 'input_path' will point to the primary spatial file (e.g., the .shp or .geojson)
-            if validated_type == "zip":
+            if validated_type in ("zip", "shapefile_zip"):
                 input_path = FileService._handle_zip_upload(temp_file_path, dataset_dir)
-                validated_type = "shapefile" # After unzipping, we treat it as a shapefile
+                validated_type = "shapefile"
             else:
                 input_path = temp_file_path
             
@@ -72,9 +72,8 @@ class FileService:
                 geo_info = FileService._extract_geo_info_from_gdf(gdf)
             elif validated_type in SUPPORTED_RASTER:
                 geo_info = FileService._extract_geo_info_from_raster(input_path)
-                geojson_path = None  # No GeoJSON preview for rasters in this implementation
+                geojson_path = None
             else:
-                # This should be caught by validate_file_type, but serves as a failsafe
                 raise HTTPException(status_code=400, detail=f"Unsupported file type: {validated_type}")
 
             # Stage 4: Create and commit the database record
@@ -84,13 +83,13 @@ class FileService:
                     dataset_id=dataset_id,
                     name=metadata.name or original_filename,
                     file_type=validated_type,
-                    file_path=str(input_path), # Store the path to the primary file, not the zip
+                    file_path=str(input_path),
                     geojson_path=str(geojson_path) if geojson_path else None,
                     size_mb=round(input_path.stat().st_size / (1024 * 1024), 2),
                     feature_count=geo_info.get("feature_count", 0),
                     bbox=geo_info.get("bbox", {}),
                     crs=geo_info.get("crs", "N/A"),
-                    status="uploaded", # Set to 'uploaded' - ingestion must be triggered separately via /api/layers/ingest/{dataset_id}
+                    status="uploaded",
                     tags=metadata.tags if isinstance(metadata.tags, list) else [],
                 )
                 db.add(ds)
@@ -102,11 +101,9 @@ class FileService:
                 db.close()
 
         except Exception as e:
-            # If anything goes wrong at any stage, ensure the temporary upload directory is removed.
             if dataset_dir.exists():
                 shutil.rmtree(dataset_dir)
             logger.error(f"Upload process failed for file '{original_filename}'. Cleaning up. Error: {e}", exc_info=True)
-            # Re-raise the exception so the API route can return a 500 error.
             raise HTTPException(status_code=500, detail=f"An internal error occurred during file processing: {e}")
 
     @staticmethod
@@ -115,7 +112,6 @@ class FileService:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_dir)
         
-        # Search for the .shp file, which is the primary file for a shapefile dataset
         shp_files = list(extract_dir.glob("*.shp"))
         if not shp_files:
             raise ValueError("The provided ZIP archive does not contain a .shp file.")
@@ -124,7 +120,6 @@ class FileService:
 
         primary_shp_path = shp_files[0]
         
-        # Validate that the essential sidecar files for the shapefile also exist
         extensions_present = {p.suffix.lower() for p in extract_dir.glob(f"{primary_shp_path.stem}.*")}
         if not REQUIRED_SHP_COMPONENTS.issubset(extensions_present):
             missing = REQUIRED_SHP_COMPONENTS - extensions_present
@@ -137,16 +132,25 @@ class FileService:
         """Converts any supported vector format into a standardized GeoJSON file."""
         if file_type == "csv":
             df = pd.read_csv(input_path)
-            # More robustly find longitude and latitude columns
             lon_col = next((c for c in df.columns if c.lower() in POSSIBLE_LON_COLS), None)
             lat_col = next((c for c in df.columns if c.lower() in POSSIBLE_LAT_COLS), None)
             if not (lon_col and lat_col):
                 raise ValueError("CSV file must contain recognizable longitude (lon, long, x) and latitude (lat, y) columns.")
             gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df[lon_col], df[lat_col]), crs="EPSG:4326")
+        elif file_type in ["geojson", "json"]:
+            with open(input_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            features = data.get("features", [])
+            gdf = gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
         else:
-            gdf = gpd.read_file(input_path)
+            try:
+                gdf = gpd.read_file(input_path)
+            except Exception:
+                with open(input_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                features = data.get("features", [])
+                gdf = gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
         
-        # Standardize CRS to WGS84 (EPSG:4326), the web standard
         if gdf.crs is None:
             logger.warning(f"Input file '{input_path.name}' has no CRS defined. Assuming WGS84 (EPSG:4326).")
             gdf.set_crs("EPSG:4326", inplace=True)
@@ -154,18 +158,31 @@ class FileService:
             logger.info(f"Re-projecting '{input_path.name}' from {gdf.crs.to_string()} to EPSG:4326.")
             gdf = gdf.to_crs("EPSG:4326")
             
-        # Write the standardized file
-        gdf.to_file(output_path, driver="GeoJSON")
+        try:
+            output_path.write_text(gdf.to_json(), encoding="utf-8")
+        except Exception:
+            gdf.to_file(output_path, driver="GeoJSON")
         return gdf
 
     @staticmethod
     def _extract_geo_info_from_gdf(gdf: gpd.GeoDataFrame) -> Dict[str, Any]:
-        """Extracts key metadata from an in-memory GeoDataFrame."""
-        bounds = gdf.total_bounds
+        """Extracts key metadata from an in-memory GeoDataFrame safely."""
+        feature_count = len(gdf)
+        bounds = gdf.total_bounds if feature_count > 0 else []
+        if len(bounds) == 4:
+            bbox = {
+                "west": float(bounds[0]),
+                "south": float(bounds[1]),
+                "east": float(bounds[2]),
+                "north": float(bounds[3])
+            }
+        else:
+            bbox = {"west": 0.0, "south": 0.0, "east": 0.0, "north": 0.0}
+
         return {
             "crs": gdf.crs.to_string() if gdf.crs else "EPSG:4326",
-            "feature_count": len(gdf),
-            "bbox": {"west": bounds[0], "south": bounds[1], "east": bounds[2], "north": bounds[3]}
+            "feature_count": feature_count,
+            "bbox": bbox
         }
 
     @staticmethod
@@ -176,7 +193,7 @@ class FileService:
                 bounds = src.bounds
                 return {
                     "crs": src.crs.to_string() if src.crs else "Unknown",
-                    "feature_count": 0, # Rasters don't have "features" in the vector sense
+                    "feature_count": 0,
                     "bbox": {"west": bounds.left, "south": bounds.bottom, "east": bounds.right, "north": bounds.top}
                 }
         except rasterio.errors.RasterioIOError as e:

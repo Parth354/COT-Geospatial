@@ -1,0 +1,138 @@
+{
+  "type": "FeatureCollection",
+  "name": "snowfall_avalanche_zones",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.25,
+              34.25
+            ],
+            [
+              75.38,
+              34.25
+            ],
+            [
+              75.38,
+              34.35
+            ],
+            [
+              75.25,
+              34.35
+            ],
+            [
+              75.25,
+              34.25
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "SNOW_JK_01",
+        "zone_name": "Gulmarg Apharwat North Face",
+        "state": "Jammu & Kashmir",
+        "elevation_m": 4120,
+        "slope_degrees": 38.5,
+        "aspect": "North-East",
+        "snowpack_depth_cm": 185,
+        "temp_c": -6.4,
+        "avalanche_danger_rating": "High Risk (Level 4)",
+        "dominant_trigger": "Wind Slab Accretion"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.12,
+              32.32
+            ],
+            [
+              77.22,
+              32.32
+            ],
+            [
+              77.22,
+              32.42
+            ],
+            [
+              77.12,
+              32.42
+            ],
+            [
+              77.12,
+              32.32
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "SNOW_HP_01",
+        "zone_name": "Rohtang Pass South Corridor",
+        "state": "Himachal Pradesh",
+        "elevation_m": 3978,
+        "slope_degrees": 34.0,
+        "aspect": "South-West",
+        "snowpack_depth_cm": 140,
+        "temp_c": -4.2,
+        "avalanche_danger_rating": "Considerable Risk (Level 3)",
+        "dominant_trigger": "Persistent Weak Layer"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              79.55,
+              30.65
+            ],
+            [
+              79.68,
+              30.65
+            ],
+            [
+              79.68,
+              30.75
+            ],
+            [
+              79.55,
+              30.75
+            ],
+            [
+              79.55,
+              30.65
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "SNOW_UK_01",
+        "zone_name": "Badrinath Mana Valley Chute",
+        "state": "Uttarakhand",
+        "elevation_m": 4450,
+        "slope_degrees": 42.0,
+        "aspect": "East",
+        "snowpack_depth_cm": 210,
+        "temp_c": -9.1,
+        "avalanche_danger_rating": "Extreme Risk (Level 5)",
+        "dominant_trigger": "New Snow Overburden"
+      }
+    }
+  ]
+}

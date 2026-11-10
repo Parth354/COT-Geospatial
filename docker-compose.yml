@@ -1,0 +1,145 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: spatialmind-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: spatialdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d spatialdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - spatialmind_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: spatialmind-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - spatialmind_network
+
+  backend:
+    build:
+      context: ./SpatialMind-backend
+      dockerfile: Dockerfile
+    container_name: spatialmind-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/spatialdb
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      UPLOAD_DIR: /app/uploads
+      RESULT_DIR: /app/results
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-AIzaSyA0TWhe__RsAwVAReUPzKZ5TCuUJPSmb-I}
+      HUGGINGFACE_HUB_TOKEN: ${HUGGINGFACE_HUB_TOKEN:-}
+    volumes:
+      - ./SpatialMind-backend:/app
+      - uploads_data:/app/uploads
+      - results_data:/app/results
+      - ./india_district.geojson:/app/app/llm/knowledge_base/system_files/india_district.geojson:ro
+      - ./india_state.geojson:/app/app/llm/knowledge_base/system_files/india_state.geojson:ro
+      - ./india_taluk.geojson:/app/app/llm/knowledge_base/system_files/india_taluk.geojson:ro
+      - ./india_telengana.geojson:/app/app/llm/knowledge_base/system_files/india_telengana.geojson:ro
+      - ./test_flood_areas_delhi.geojson:/app/app/llm/knowledge_base/system_files/test_flood_areas_delhi.geojson:ro
+      - ./test_urban_areas_delhi.geojson:/app/app/llm/knowledge_base/system_files/test_urban_areas_delhi.geojson:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - spatialmind_network
+
+  celery_worker:
+    build:
+      context: ./SpatialMind-backend
+      dockerfile: Dockerfile
+    container_name: spatialmind-celery
+    restart: unless-stopped
+    command: celery -A app.core.celery_app.celery_app worker -l info -Q celery
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/spatialdb
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      UPLOAD_DIR: /app/uploads
+      RESULT_DIR: /app/results
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-AIzaSyA0TWhe__RsAwVAReUPzKZ5TCuUJPSmb-I}
+      HUGGINGFACE_HUB_TOKEN: ${HUGGINGFACE_HUB_TOKEN:-}
+    volumes:
+      - ./SpatialMind-backend:/app
+      - uploads_data:/app/uploads
+      - results_data:/app/results
+      - ./india_district.geojson:/app/app/llm/knowledge_base/system_files/india_district.geojson:ro
+      - ./india_state.geojson:/app/app/llm/knowledge_base/system_files/india_state.geojson:ro
+      - ./india_taluk.geojson:/app/app/llm/knowledge_base/system_files/india_taluk.geojson:ro
+      - ./india_telengana.geojson:/app/app/llm/knowledge_base/system_files/india_telengana.geojson:ro
+      - ./test_flood_areas_delhi.geojson:/app/app/llm/knowledge_base/system_files/test_flood_areas_delhi.geojson:ro
+      - ./test_urban_areas_delhi.geojson:/app/app/llm/knowledge_base/system_files/test_urban_areas_delhi.geojson:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - spatialmind_network
+
+  frontend:
+    build:
+      context: ./SpatialMind-frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: spatialmind-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./SpatialMind-frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - spatialmind_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+  results_data:
+
+networks:
+  spatialmind_network:
+    driver: bridge

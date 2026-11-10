@@ -37,6 +37,10 @@ geopandas
 pandas
 rasterio
 
+# HTTP & Networking
+httpx
+requests
+
 # LLM + LangChain stack
 langchain-core
 langchain-community

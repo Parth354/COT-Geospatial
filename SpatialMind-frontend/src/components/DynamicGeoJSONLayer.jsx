@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GeoJSON, useMap, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
 import { debounce } from 'lodash';
 import { layerAPI } from '../api/layerAPI.js';
 import { AlertTriangle } from 'lucide-react';
@@ -9,7 +10,6 @@ const LayerErrorIndicator = ({ message }) => (
     <AlertTriangle className="h-4 w-4" /> {message}
   </div>
 );
-
 
 const DynamicGeoJSONLayer = React.memo(({ layer }) => {
   const map = useMap();
@@ -21,7 +21,6 @@ const DynamicGeoJSONLayer = React.memo(({ layer }) => {
   const isStaticLayer = layer.type === 'analysis_result' && layer.dataUrl;
 
   const fetchData = useCallback(debounce(async () => {
-    // For static layers, only fetch once
     if (isStaticLayer && hasLoadedStatic) {
       return;
     }
@@ -29,10 +28,8 @@ const DynamicGeoJSONLayer = React.memo(({ layer }) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Check if this is an analysis result layer with a static file URL
       if (isStaticLayer) {
-        // Fetch directly from static file URL
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
         const fullUrl = layer.dataUrl.startsWith('http') ? layer.dataUrl : `${baseUrl}${layer.dataUrl}`;
         const response = await fetch(fullUrl);
         if (!response.ok) {
@@ -42,7 +39,6 @@ const DynamicGeoJSONLayer = React.memo(({ layer }) => {
         setGeojsonData(data);
         setHasLoadedStatic(true);
       } else {
-        // Regular layer - fetch via API with bbox/zoom
         const bounds = map.getBounds();
         const zoom = map.getZoom();
         const data = await layerAPI.fetchLayerData(layer.layerId, {
@@ -52,11 +48,8 @@ const DynamicGeoJSONLayer = React.memo(({ layer }) => {
         setGeojsonData(data);
       }
     } catch (err) {
-      // layerAPI.fetchLayerData now returns empty collection instead of throwing
-      // But handle any unexpected errors gracefully
       console.error(`Failed to fetch data for layer ${layer.layerId}:`, err);
       setGeojsonData({ type: 'FeatureCollection', features: [] });
-      // Don't set error state for empty layers - they're valid
       if (err.message && !err.message.includes('404') && !err.message.toLowerCase().includes('not found')) {
         setError('Failed to load layer data.');
       }
@@ -69,33 +62,99 @@ const DynamicGeoJSONLayer = React.memo(({ layer }) => {
     fetchData();
   }, [fetchData]);
 
-  // Subscribe to map events - fetchData will skip if it's a static layer that's already loaded
   useMapEvents({ moveend: fetchData, zoomend: fetchData });
+
+  // Dynamic feature-level styling based on attribute properties (color, fillColor, opacity)
+  const getFeatureStyle = (feature) => {
+    const props = feature?.properties || {};
+    const featColor = props.color || props.fillColor || layer?.style?.color || '#2563eb';
+    const featOpacity = props.opacity ?? props.fillOpacity ?? layer?.style?.fillOpacity ?? 0.65;
+    const isPolygon = feature?.geometry?.type?.includes('Polygon');
+
+    return {
+      color: featColor,
+      fillColor: featColor,
+      fillOpacity: featOpacity,
+      weight: isPolygon ? 1.5 : 2,
+      opacity: 0.9,
+    };
+  };
+
+  // Render point features as dynamic circle markers with color classification
+  const pointToLayer = (feature, latlng) => {
+    const props = feature?.properties || {};
+    const color = props.color || props.fillColor || '#ef4444';
+    let radius = 7;
+    if (props.aqi || props.interpolated_aqi || props.forecast_aqi) {
+      const val = props.forecast_aqi || props.interpolated_aqi || props.aqi;
+      radius = Math.min(Math.max(val / 30, 6), 14);
+    } else if (props.total_frp_mw || props.frp) {
+      const frp = props.total_frp_mw || props.frp;
+      radius = Math.min(Math.max(frp / 25, 6), 16);
+    }
+
+    return L.circleMarker(latlng, {
+      radius: radius,
+      fillColor: color,
+      color: '#ffffff',
+      weight: 2,
+      opacity: 0.95,
+      fillOpacity: 0.85,
+    });
+  };
 
   const onEachFeature = (feature, layerInstance) => {
     if (feature.properties) {
+      const p = feature.properties;
+      const title = p.station_name || p.cluster_id || p.district || p.name || p.aqi_category || p.flood_risk_level || p.weather_alert;
+      const metric = p.interpolated_aqi ?? p.forecast_aqi ?? p.aqi ?? p.total_frp_mw ?? p.submerged_area_km2;
+
+      // Hover tooltip
+      if (title || metric !== undefined) {
+        const tooltipText = title ? (metric !== undefined ? `${title}: ${metric}` : `${title}`) : `Value: ${metric}`;
+        layerInstance.bindTooltip(tooltipText, { sticky: true });
+      }
+
+      // Detailed popup
       const popupContent = `
-        <div class="max-h-48 overflow-y-auto pr-2">
-          <table class="w-full text-xs table-auto">
+        <div class="max-h-56 overflow-y-auto pr-1">
+          <div class="font-bold text-xs text-gray-800 pb-1 mb-1 border-b border-gray-200">
+            ${title || 'Feature Inspection'}
+          </div>
+          <table class="w-full text-[11px] table-auto">
             <tbody>
-              ${Object.entries(feature.properties)
-                .map(([key, value]) => `
+              ${Object.entries(p)
+                .filter(([k]) => k !== 'color' && k !== 'opacity')
+                .map(([key, value]) => {
+                  const displayValue = typeof value === 'object' && value !== null 
+                    ? JSON.stringify(value) 
+                    : (value !== undefined && value !== null ? String(value) : 'N/A');
+                  return `
                   <tr>
-                    <td class="font-bold p-1 pr-3 align-top">${key}</td>
-                    <td class="p-1 break-words">${value ?? 'N/A'}</td>
-                  </tr>`)
+                    <td class="font-semibold p-0.5 pr-2 align-top text-gray-600">${key}</td>
+                    <td class="p-0.5 break-words text-gray-900">${displayValue}</td>
+                  </tr>`;
+                })
                 .join('')}
             </tbody>
           </table>
         </div>`;
-      layerInstance.bindPopup(popupContent, { maxWidth: 400 });
+      layerInstance.bindPopup(popupContent, { maxWidth: 380 });
     }
   };
 
   if (isLoading) return null; 
   if (error) return <LayerErrorIndicator message={error} />;
 
-  return <GeoJSON key={layer.layerId} data={geojsonData} style={layer.style} onEachFeature={onEachFeature} />;
+  return (
+    <GeoJSON 
+      key={layer.layerId} 
+      data={geojsonData} 
+      style={getFeatureStyle} 
+      pointToLayer={pointToLayer}
+      onEachFeature={onEachFeature} 
+    />
+  );
 });
 DynamicGeoJSONLayer.displayName = 'DynamicGeoJSONLayer';
 

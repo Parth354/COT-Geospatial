@@ -1,0 +1,189 @@
+{
+  "type": "FeatureCollection",
+  "name": "Test Urban Areas - Delhi",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 1,
+        "name": "Connaught Place",
+        "type": "Commercial",
+        "area_km2": 1.2,
+        "population": 5000,
+        "density_per_km2": 4167,
+        "district": "New Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2100, 28.6300],
+          [77.2200, 28.6300],
+          [77.2200, 28.6400],
+          [77.2100, 28.6400],
+          [77.2100, 28.6300]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 2,
+        "name": "Old Delhi",
+        "type": "Residential",
+        "area_km2": 2.5,
+        "population": 50000,
+        "density_per_km2": 20000,
+        "district": "Central Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2300, 28.6500],
+          [77.2500, 28.6500],
+          [77.2500, 28.6700],
+          [77.2300, 28.6700],
+          [77.2300, 28.6500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 3,
+        "name": "Dwarka",
+        "type": "Residential",
+        "area_km2": 5.8,
+        "population": 120000,
+        "density_per_km2": 20690,
+        "district": "South West Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.0500, 28.5800],
+          [77.0800, 28.5800],
+          [77.0800, 28.6100],
+          [77.0500, 28.6100],
+          [77.0500, 28.5800]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 4,
+        "name": "Rohini",
+        "type": "Residential",
+        "area_km2": 4.2,
+        "population": 95000,
+        "density_per_km2": 22619,
+        "district": "North West Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.1200, 28.7200],
+          [77.1500, 28.7200],
+          [77.1500, 28.7500],
+          [77.1200, 28.7500],
+          [77.1200, 28.7200]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 5,
+        "name": "Noida Border Area",
+        "type": "Mixed",
+        "area_km2": 3.5,
+        "population": 75000,
+        "density_per_km2": 21429,
+        "district": "East Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.3200, 28.5700],
+          [77.3500, 28.5700],
+          [77.3500, 28.6000],
+          [77.3200, 28.6000],
+          [77.3200, 28.5700]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 6,
+        "name": "Gurgaon Border",
+        "type": "Commercial",
+        "area_km2": 2.1,
+        "population": 25000,
+        "density_per_km2": 11905,
+        "district": "South Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.1800, 28.4200],
+          [77.2000, 28.4200],
+          [77.2000, 28.4400],
+          [77.1800, 28.4400],
+          [77.1800, 28.4200]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 7,
+        "name": "Airport Area",
+        "type": "Infrastructure",
+        "area_km2": 1.5,
+        "population": 8000,
+        "density_per_km2": 5333,
+        "district": "South West Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.0900, 28.5500],
+          [77.1100, 28.5500],
+          [77.1100, 28.5700],
+          [77.0900, 28.5700],
+          [77.0900, 28.5500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 8,
+        "name": "University Area",
+        "type": "Educational",
+        "area_km2": 0.8,
+        "population": 15000,
+        "density_per_km2": 18750,
+        "district": "South Delhi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [77.2000, 28.5400],
+          [77.2100, 28.5400],
+          [77.2100, 28.5500],
+          [77.2000, 28.5500],
+          [77.2000, 28.5400]
+        ]]
+      }
+    }
+  ]
+}
+

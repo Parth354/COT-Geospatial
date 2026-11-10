@@ -48,7 +48,8 @@ export function jobReducer(state, action) {
           jobId: state.activeJobId,
           summary: message,
           layers: layers,
-          analysis_summary: analysis_summary
+          analysis_summary: analysis_summary,
+          full_history: action.payload.full_history || []
         },
         // Flag to auto-add layers to map
         _pendingLayersToAdd: layers.map(layer => ({
@@ -80,7 +81,7 @@ export function jobReducer(state, action) {
         const datasetId = ingestionPayload?.dataset_id || ingestionPayload?.layer?.layer_id;
         const jobId = ingestionPayload?.job_id || datasetId;
         
-        console.log(`📦 Ingestion ${action.type}:`, { datasetId, jobId, payload: ingestionPayload });
+        console.log(`[JobReducer] Ingestion ${action.type}:`, { datasetId, jobId, payload: ingestionPayload });
         
         if (!datasetId) {
             console.warn(`[jobReducer] ${action.type} received but no dataset_id found in payload:`, ingestionPayload);

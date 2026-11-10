@@ -1,9 +1,44 @@
-node_modules
-__pycache__
-gitignore
-.venv
-migrations
-static
-.env
+# Dependencies
+node_modules/
 package-lock.json
-knowledge_base
+
+# Environment variables & secrets (CRITICAL)
+.env
+*.env
+.env.*
+!.env.example
+SpatialMind-backend/.env
+SpatialMind-frontend/.env
+
+# Python build & cache artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Dynamic Job Uploads and Results
+SpatialMind-backend/uploads/*
+SpatialMind-backend/uploads/*/
+!SpatialMind-backend/uploads/.gitkeep
+SpatialMind-backend/results/*
+SpatialMind-backend/results/*/
+!SpatialMind-backend/results/.gitkeep
+static/
+static/results/
+static/uploads/
+
+# Frontend build output
+SpatialMind-frontend/dist/
+SpatialMind-frontend/.vite/
+
+# Logs & OS artifacts
+*.log
+.DS_Store
+Thumbs.db

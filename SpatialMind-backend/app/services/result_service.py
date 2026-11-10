@@ -45,6 +45,14 @@ class ResultService:
         if result.metrics and 'layers' in result.metrics:
              result_data['layers'] = result.metrics.get('layers', [])
              
+        audit_path = RESULTS_BASE_DIR / job_id / "data_completeness_audit.json"
+        if audit_path.exists():
+            try:
+                with open(audit_path, 'r') as f:
+                    result_data["data_completeness_audit"] = json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to read data completeness audit file for job {job_id}: {e}")
+
         return result_data
 
     @staticmethod
@@ -72,6 +80,23 @@ class ResultService:
         except Exception as e:
             logger.error(f"Failed to save history file for job '{job_id}': {e}")
             history_path_str = None
+
+        # Save data completeness & limitation audit file
+        completeness_audit = data.get("metrics", {}).get("data_completeness_audit") or data.get("analysis_summary", {}).get("data_completeness_audit")
+        if completeness_audit:
+            try:
+                audit_file = job_result_dir / "data_completeness_audit.json"
+                with open(audit_file, 'w') as f:
+                    json.dump(completeness_audit, f, indent=2)
+                logger.info(f"Saved data completeness audit for job '{job_id}' to: {audit_file}")
+                
+                # Also mirror into static/results so it can be downloaded directly from the web server
+                static_dir = Path(f"./static/results/{job_id}").resolve()
+                if static_dir.exists():
+                    with open(static_dir / "data_completeness_audit.json", 'w') as f:
+                        json.dump(completeness_audit, f, indent=2)
+            except Exception as e:
+                logger.warning(f"Could not save data completeness audit file: {e}")
        
         try:
             processing_time_float = float(str(processing_time).lower().replace('s', ''))

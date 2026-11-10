@@ -1,3 +1,5 @@
+from pathlib import Path
+from app.models.dataset import Dataset
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -57,12 +59,24 @@ class LayerService:
         # ✅ FIX: Filter by the dataset_id, not the layer_id (which is a feature's primary key).
         # The incoming `layer_id` parameter actually represents the ID of the parent dataset.
         
-        # First, check if any records exist for this dataset_id
-        total_count = db.query(Layer).filter(Layer.dataset_id == layer_id).count()
-        logger.info(f"Total layer records in database for dataset_id '{layer_id}': {total_count}")
-        
+        # First, check if any records exist for this dataset_id in PostGIS
+        total_count = 0
+        try:
+            total_count = db.query(Layer).filter(Layer.dataset_id == layer_id).count()
+            logger.info(f"Total layer records in database for dataset_id '{layer_id}': {total_count}")
+        except Exception as e:
+            logger.warning(f"Could not query Layer table directly ({e}). Trying GeoJSON file fallback.")
+
         if total_count == 0:
-            logger.warning(f"No layer records found for dataset_id '{layer_id}'. Dataset may not be ingested yet.")
+            dataset = db.query(Dataset).filter(Dataset.dataset_id == layer_id).first()
+            if dataset and dataset.geojson_path and Path(dataset.geojson_path).exists():
+                logger.info(f"Serving layer data directly from GeoJSON file: {dataset.geojson_path}")
+                try:
+                    with open(dataset.geojson_path, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except Exception as ex:
+                    logger.error(f"Error reading GeoJSON fallback: {ex}")
+            logger.warning(f"No layer records or fallback file found for dataset_id '{layer_id}'.")
             return {"type": "FeatureCollection", "features": []}
         
         # Simplified query - first try without complex transformations to debug

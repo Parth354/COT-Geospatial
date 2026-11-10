@@ -15,12 +15,17 @@ from app.api.routes_datasets import router as dataset_router
 from app.api.routes_query import router as query_router
 from app.api.routes_results import router as results_router
 from app.api.routes_upload import router as upload_router
+from app.api.routes_settings import router as settings_router
 
 # --- WebSocket Imports ---
 from app.sockets.websocket_endpoint import router as websocket_router
 from app.core.websocket_manager import manager as websocket_manager
 
 from app.core.config import settings
+from app.models.database import Base, engine
+import app.models.dataset
+import app.models.layer
+import app.models.result
 
 # Setup a proper logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -34,9 +39,17 @@ app = FastAPI(
 )
 
 # --- Middleware Configuration ---
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://localhost:80",
+    "http://localhost",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,8 +69,15 @@ app.include_router(dataset_router, prefix=API_PREFIX, tags=["Datasets"])
 app.include_router(query_router, prefix=API_PREFIX, tags=["Query"])
 app.include_router(results_router, prefix=API_PREFIX, tags=["Results"])
 app.include_router(upload_router, prefix=API_PREFIX, tags=["Upload"])
+app.include_router(settings_router, prefix=API_PREFIX, tags=["Settings"])
 
 app.include_router(websocket_router, tags=["WebSockets"])
+
+# --- Health check endpoint ---
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "service": "SpatialMind API"}
 
 # --- Session Endpoint to Set Cookie ---
 @app.get("/api/session")
@@ -75,8 +95,25 @@ def create_session(request: Request, response: Response):
 # --- Application Lifecycle Events ---
 @app.on_event("startup")
 async def startup_event():
-    logger.info("🚀 FastAPI server is starting up...")
+    logger.info(" FastAPI server is starting up...")
 
+    # Ensure database tables exist
+    try:
+        logger.info("Verifying database schema...")
+        from app.models.dataset import Dataset
+        from app.models.result import Result
+        from app.models.layer import Layer
+        for model in [Dataset, Result, Layer]:
+            try:
+                model.__table__.create(bind=engine, checkfirst=True)
+                logger.info(f"Table '{model.__tablename__}' verified/created.")
+            except Exception as te:
+                logger.warning(f"Table '{model.__tablename__}' creation notice: {te}")
+        logger.info("Database schema verification complete.")
+    except Exception as e:
+        logger.warning(f"Could not initialize database schema automatically: {e}")
+
+    # Start WebSocket background tasks
     if websocket_manager.pubsub_task is None or websocket_manager.pubsub_task.done():
         websocket_manager.pubsub_task = asyncio.create_task(websocket_manager._redis_subscriber())
         logger.info("WebSocket Redis subscriber background task started.")
@@ -85,12 +122,12 @@ async def startup_event():
         websocket_manager.message_processor_task = asyncio.create_task(websocket_manager._process_broadcast_queue())
         logger.info("WebSocket message processor background task started.")
 
-    logger.info("✅ Server startup complete.")
+    logger.info("[OK] Server startup complete.")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    logger.info("🛑 FastAPI server is shutting down...")
+    logger.info(" FastAPI server is shutting down...")
 
     tasks_to_cancel = [
         websocket_manager.pubsub_task,
@@ -109,4 +146,4 @@ async def shutdown_event():
             except Exception as e:
                 logger.error(f"Error during shutdown of task {task.get_name()}: {e}", exc_info=True)
 
-    logger.info("✅ Server shutdown complete.")
+    logger.info("[OK] Server shutdown complete.")

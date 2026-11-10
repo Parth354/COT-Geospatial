@@ -1,0 +1,11 @@
+[
+  {
+    "id": "usgs-earthquake-mcp",
+    "name": "USGS Real-Time Seismic MCP",
+    "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4.5&limit=20",
+    "transport": "http_rest",
+    "description": "Global seismic monitoring feeds and tectonic hazard telemetry.",
+    "enabled": true,
+    "custom_headers": {}
+  }
+]

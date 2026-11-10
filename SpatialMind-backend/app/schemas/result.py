@@ -1,59 +1,57 @@
-from typing import List
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 class LayerStyle(BaseModel):
-    fill_color: str
-    fill_opacity: float
-    stroke_color: str
-    stroke_width: int
+    fill_color: Optional[str] = "#3388ff"
+    fill_opacity: Optional[float] = 0.5
+    stroke_color: Optional[str] = "#0000ff"
+    stroke_width: Optional[int] = 2
 
 class LayerLegend(BaseModel):
-    high: str
-    medium: str
-    low: str
+    high: Optional[str] = "High"
+    medium: Optional[str] = "Medium"
+    low: Optional[str] = "Low"
 
 class MapLayer(BaseModel):
     layer_id: str
     name: str
     type: str
-    style: LayerStyle
-    data_url: str
-    legend: LayerLegend
+    style: Optional[LayerStyle] = None
+    data_url: Optional[str] = None
+    legend: Optional[LayerLegend] = None
 
     class Config:
         from_attributes = True
+        extra = "allow"
 
 class DownloadableFile(BaseModel):
     name: str
     url: str
-    size_mb: float
+    size_mb: Optional[float] = 0.0
 
     class Config:
         from_attributes = True
+        extra = "allow"
 
 class Metrics(BaseModel):
-    total_area_km2: float
-    high_risk_area_km2: float
-    affected_population: int
+    total_area_km2: Optional[float] = None
+    high_risk_area_km2: Optional[float] = None
+    affected_population: Optional[int] = None
 
     class Config:
         from_attributes = True
-
-class ResultsData(BaseModel):
-    map_layers: List[MapLayer]
-    metrics: Metrics
-    summary: str
-    downloadable_files: List[DownloadableFile]
-
-    class Config:
-        from_attributes = True
+        extra = "allow"
 
 class ResultsResponse(BaseModel):
     job_id: str
     status: str
-    results: ResultsData
-    processing_time: str
-    created_at: str
+    summary: Optional[str] = None
+    processing_time_seconds: Optional[float] = None
+    created_at: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None
+    full_history: Optional[Any] = None
+    layers: Optional[List[Dict[str, Any]]] = []
 
     class Config:
         from_attributes = True
+        extra = "allow"

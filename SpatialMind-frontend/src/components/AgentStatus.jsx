@@ -14,9 +14,9 @@ const AgentStatus = React.memo(() => {
     // Determine the status message based on a priority order.
     let statusMessage = '';
     if (isAgentLoading) {
-        statusMessage = "Agent is processing...";
+        statusMessage = "Engine processing...";
     } else if (isIngesting) {
-        statusMessage = "Ingesting dataset...";
+        statusMessage = "Ingesting spatial layer...";
     }
     
     // Don't render anything if the system is fully idle.

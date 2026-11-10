@@ -78,6 +78,8 @@ export const useAppActions = (dispatch) => {
     clearResults: () => dispatch({ type: 'SET_RESULTS', payload: { results: null } }),
     /** Toggles fullscreen mode for the map viewer. */
     toggleMapFullscreen: () => dispatch({ type: 'TOGGLE_MAP_FULLSCREEN' }),
+    openSettings: () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: true }),
+    closeSettings: () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: false }),
 
     // ===================================
     // Notification Actions

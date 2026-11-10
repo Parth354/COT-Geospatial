@@ -1,0 +1,156 @@
+{
+  "type": "FeatureCollection",
+  "name": "active_wildfire_hotspots",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          79.421,
+          29.382
+        ]
+      },
+      "properties": {
+        "id": "FIRE_UK_01",
+        "location": "Nainital Forest Range, Uttarakhand",
+        "latitude": 29.382,
+        "longitude": 79.421,
+        "brightness_k": 348.5,
+        "confidence": "high",
+        "frp_mw": 84.2,
+        "satellite": "Suomi NPP / VIIRS",
+        "acq_date": "2026-11-09",
+        "acq_time": "08:15",
+        "fire_type": "Wildfire Front",
+        "severity": "High"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          79.445,
+          29.395
+        ]
+      },
+      "properties": {
+        "id": "FIRE_UK_02",
+        "location": "Bhowali Ridge, Uttarakhand",
+        "latitude": 29.395,
+        "longitude": 79.445,
+        "brightness_k": 362.1,
+        "confidence": "high",
+        "frp_mw": 115.7,
+        "satellite": "Suomi NPP / VIIRS",
+        "acq_date": "2026-11-09",
+        "acq_time": "08:15",
+        "fire_type": "Wildfire Front",
+        "severity": "Severe"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          79.41,
+          29.37
+        ]
+      },
+      "properties": {
+        "id": "FIRE_UK_03",
+        "location": "Jeolikote Buffer, Uttarakhand",
+        "latitude": 29.37,
+        "longitude": 79.41,
+        "brightness_k": 328.0,
+        "confidence": "nominal",
+        "frp_mw": 32.4,
+        "satellite": "NOAA-20 / VIIRS",
+        "acq_date": "2026-11-09",
+        "acq_time": "08:18",
+        "fire_type": "Smoldering Understory",
+        "severity": "Moderate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          81.012,
+          23.714
+        ]
+      },
+      "properties": {
+        "id": "FIRE_MP_01",
+        "location": "Bandhavgarh Core Sector, Madhya Pradesh",
+        "latitude": 23.714,
+        "longitude": 81.012,
+        "brightness_k": 375.4,
+        "confidence": "high",
+        "frp_mw": 164.0,
+        "satellite": "Aqua / MODIS",
+        "acq_date": "2026-11-09",
+        "acq_time": "07:45",
+        "fire_type": "Crown Wildfire",
+        "severity": "Extreme"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          81.035,
+          23.729
+        ]
+      },
+      "properties": {
+        "id": "FIRE_MP_02",
+        "location": "Tala Range Perimeter, Madhya Pradesh",
+        "latitude": 23.729,
+        "longitude": 81.035,
+        "brightness_k": 355.0,
+        "confidence": "high",
+        "frp_mw": 96.5,
+        "satellite": "Aqua / MODIS",
+        "acq_date": "2026-11-09",
+        "acq_time": "07:45",
+        "fire_type": "Surface Fire",
+        "severity": "High"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          86.321,
+          21.845
+        ]
+      },
+      "properties": {
+        "id": "FIRE_OD_01",
+        "location": "Similipal Biosphere Reserve, Odisha",
+        "latitude": 21.845,
+        "longitude": 86.321,
+        "brightness_k": 339.2,
+        "confidence": "nominal",
+        "frp_mw": 52.8,
+        "satellite": "Suomi NPP / VIIRS",
+        "acq_date": "2026-11-09",
+        "acq_time": "08:05",
+        "fire_type": "Deciduous Forest Fire",
+        "severity": "Moderate"
+      }
+    }
+  ]
+}

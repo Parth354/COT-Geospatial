@@ -6,13 +6,13 @@ export const layerAPI = {
     try {
       if (!datasetId) throw new Error('Dataset ID is required to start ingestion.');
 
-      console.log(`🚀 Triggering ingestion for dataset: ${datasetId}`);
+      console.log(`[LayerAPI] Triggering ingestion for dataset: ${datasetId}`);
       const response = await api.post(`/api/layers/ingest/${datasetId}`);
 
       const { task_id, status, message } = response.data;
 
       if (!task_id) {
-        console.warn('⚠️ No task_id returned from ingestion endpoint. Status:', status);
+        console.warn('[LayerAPI] Warning: No task_id returned from ingestion endpoint. Status:', status);
         // If already processed, update the dataset status in the frontend
         if (status === 'processed' && actions) {
           actions.updateDatasetStatus(datasetId, 'processed');
@@ -20,7 +20,7 @@ export const layerAPI = {
         return { taskId: null, message, status };
       }
 
-      console.log(`🗂️ Ingestion triggered. Task ID: ${task_id}, Status: ${status}`);
+      console.log(`[LayerAPI] Ingestion triggered. Task ID: ${task_id}, Status: ${status}`);
 
       // Subscribe to WebSocket job updates using task_id
       webSocketService.subscribe(task_id);
@@ -33,7 +33,7 @@ export const layerAPI = {
 
       return { taskId: task_id, message, status };
     } catch (err) {
-      console.error('❌ Failed to trigger ingestion:', err);
+      console.error('[LayerAPI] Failed to trigger ingestion:', err);
       throw err;
     }
   },
@@ -57,11 +57,11 @@ export const layerAPI = {
       const queryString = params.toString();
       const url = `/api/layers/${layerId}/data${queryString ? `?${queryString}` : ''}`;
       
-      console.log(`🗺️ Fetching layer data for ${layerId} with params:`, Object.fromEntries(params));
+      console.log(`[LayerAPI] Fetching layer data for ${layerId} with params:`, Object.fromEntries(params));
 
       const response = await api.get(url);
 
-      console.log(`✅ Layer data fetched for ${layerId}:`, {
+      console.log(`[LayerAPI] Layer data fetched for ${layerId}:`, {
         featureCount: response.data?.features?.length || 0,
         type: response.data?.type,
       });

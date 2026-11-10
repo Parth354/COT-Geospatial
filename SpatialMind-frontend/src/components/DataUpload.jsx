@@ -111,14 +111,14 @@ function DataUpload() {
                         Drop file or <span className="text-blue-600">browse</span>
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                        GeoJSON, Shapefile (.zip), KML, GeoTIFF, etc.
+                        GeoJSON, Shapefile (.zip), CSV (lat/lon), GeoTIFF (.tif), KML
                     </p>
                     <input 
                         ref={fileInputRef} 
                         type="file" 
                         onChange={handleInputChange} 
                         className="hidden" 
-                        accept=".geojson,.json,.zip,.kml,.kmz,.tiff,.tif,.shp"
+                        accept=".geojson,.json,.zip,.kml,.kmz,.tiff,.tif,.shp,.csv"
                     />
                 </div>
             </div>
@@ -157,7 +157,7 @@ function DataUpload() {
                     </h4>
                     <div className="space-y-2 max-h-[calc(100vh-500px)] overflow-y-auto pr-2">
                         {state.uploadedDatasets
-                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                            .sort((a, b) => new Date(b.upload_time || b.created_at || 0) - new Date(a.upload_time || a.created_at || 0))
                             .map((dataset) => (
                                 <DatasetItem key={dataset.dataset_id} dataset={dataset} />
                             ))

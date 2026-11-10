@@ -2,42 +2,24 @@
 
 import logging
 from app.core.config import settings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from app.llm.universal_llm import UniversalRestLLM
 
 logger = logging.getLogger(__name__)
 _llm_instances = {}
 
-def get_llm(model_type: str = "gemini"):
+def get_llm(model_type: str = "auto") -> UniversalRestLLM:
     """
-    Factory function to get a shared LangChain-compatible instance of a language model.
+    Factory function returning a production-grade UniversalRestLLM.
+    Supports Groq, OpenAI, Google Gemini, and Local Ollama with genuine API execution.
+    NO MOCKING: Calls actual endpoints and reports real authentication status.
     """
-    if model_type in _llm_instances:
-        return _llm_instances[model_type]
+    provider = model_type if model_type in ["groq", "openai", "gemini", "ollama"] else settings.LLM_PROVIDER
+    instance_key = f"{provider}"
 
-    logger.info(f"Initializing LLM of type '{model_type}' for the first time...")
-    llm_instance = None
+    if instance_key in _llm_instances:
+        return _llm_instances[instance_key]
 
-    if model_type == "gemini":
-        if not settings.GOOGLE_API_KEY:
-            logger.error("FATAL: GOOGLE_API_KEY is not set in environment variables.")
-            raise ValueError("GOOGLE_API_KEY must be configured for the Gemini model.")
-        
-        try:
-            llm_instance = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                google_api_key=settings.GOOGLE_API_KEY,
-                temperature=0.0,
-                convert_system_message_to_human=True
-            )
-            logger.info("Successfully initialized LangChain-wrapped Google Gemini model.")
-        except Exception as e:
-            logger.error(f"Failed to initialize Gemini model: {e}", exc_info=True)
-            raise RuntimeError("Could not connect to Google Gemini API.")
-    
-    # ... (Your local 'mistral' logic would go here, also ensuring it returns a LangChain-compatible object)
-
-    else:
-        raise ValueError(f"Unsupported model type requested: '{model_type}'")
-
-    _llm_instances[model_type] = llm_instance
-    return llm_instance
+    logger.info(f"Initializing UniversalRestLLM for provider '{provider}'...")
+    instance = UniversalRestLLM(provider=provider)
+    _llm_instances[instance_key] = instance
+    return instance

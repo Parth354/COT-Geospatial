@@ -6,6 +6,7 @@ import { useAppContext } from '../hooks/AppContext';
 import LayerControl from './LayerControl';
 import MapController from './MapController';
 import DynamicGeoJSONLayer from './DynamicGeoJSONLayer';
+import MapLegend from './MapLegend';
 import ChatWindow from './ChatWindow';
 import ResultPanel from './ResultPanel';
 
@@ -114,6 +115,7 @@ function MapViewer() {
         </div>
       </div>
       <LayerControl />
+      <MapLegend />
       <MapContainer 
         center={state.mapCenter} 
         zoom={state.mapZoom} 

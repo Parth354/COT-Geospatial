@@ -46,6 +46,18 @@ class ToolExecutor:
                 self.tools[name] = func
                 self.tool_docstrings[name] = {"description": inspect.cleandoc(func.__doc__)}
 
+        # Discover and register dynamic tools from active Model Context Protocol (MCP) servers
+        try:
+            from app.services.mcp_service import MCPService
+            mcp_tools = MCPService.get_dynamic_mcp_tools()
+            for mcp_name, (mcp_func, mcp_doc) in mcp_tools.items():
+                self.tools[mcp_name] = mcp_func
+                self.tool_docstrings[mcp_name] = {"description": mcp_doc}
+            if mcp_tools:
+                logger.info(f"Dynamically registered {len(mcp_tools)} MCP tool(s) into ToolExecutor.")
+        except Exception as e:
+            logger.warning(f"Notice: MCP tool discovery skipped or failed: {e}")
+
     def register_tool(self, tool_name: str, tool_function: Callable, description: str):
         """Dynamically registers a new tool, such as a web search tool."""
         if tool_name in self.tools:
@@ -97,7 +109,21 @@ class ToolExecutor:
             return f"Error: Asset ID '{asset_id}' not found. Available assets: {list(self.available_file_map.keys())}"
         try:
             filepath = self.available_file_map[asset_id]
-            self.state[output_name] = gpd.read_file(filepath)
+            # Handle raster GeoTIFF files
+            if filepath.lower().endswith(('.tif', '.tiff', '.geotiff')):
+                import rasterio
+                with rasterio.open(filepath) as src:
+                    self.state[output_name] = filepath
+                    self.loaded_asset_keys.add(output_name)
+                    return f"Success: Loaded raster GeoTIFF '{asset_id}' as layer '{output_name}' ({src.width}x{src.height} px, {src.count} band(s), CRS: {src.crs})."
+
+            try:
+                self.state[output_name] = gpd.read_file(filepath)
+            except Exception:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                features = data.get("features", [])
+                self.state[output_name] = gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
             self.loaded_asset_keys.add(output_name)
             return f"Success: Loaded '{asset_id}' as layer '{output_name}' with {len(self.state[output_name])} features."
         except Exception as e:
@@ -173,10 +199,17 @@ class ToolExecutor:
                 logger.info(f"Skipping save for '{name}': it was an initial input file.")
                 continue
 
+            if not isinstance(gdf, gpd.GeoDataFrame):
+                logger.info(f"Skipping save for non-vector layer '{name}'.")
+                continue
+
             try:
                 gdf_wgs84 = gdf.to_crs("EPSG:4326")
                 output_path = self.results_dir / f"{name}.geojson"
-                gdf_wgs84.to_file(output_path, driver="GeoJSON")
+                try:
+                    output_path.write_text(gdf_wgs84.to_json(), encoding="utf-8")
+                except Exception:
+                    gdf_wgs84.to_file(output_path, driver="GeoJSON")
                 bounds = gdf_wgs84.total_bounds
                 final_outputs.append({
                     "layer_name": name,

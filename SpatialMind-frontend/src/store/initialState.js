@@ -18,4 +18,5 @@ export const initialState = {
   mapZoom: 5,
   mapFitBounds: null,
   mapFullscreen: false,
+  isSettingsOpen: false,
 };
