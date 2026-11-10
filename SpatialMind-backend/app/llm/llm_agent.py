@@ -83,6 +83,8 @@ The following data files are available in your workspace. You MUST use the `load
   * Live Meteorological Telemetry: `fetch_openweather_telemetry(city="Delhi")`
   * Service Area Travel Isochrones: `fetch_mapbox_isochrone(lon=77.2090, lat=28.6139, minutes=15)` or `calculate_service_area_isochrones(lon, lat, cutoffs_minutes=[5, 10, 15])`
   * Exact Road Network Route: `calculate_optimal_route(origin_lat, origin_lon, destination_lat, destination_lon)`
+  * Universal Custom Data APIs: Call `query_custom_data_api(api_id, query_params, output_name)` to pull live data from any user-configured REST/spatial endpoint (e.g. `api_id="usgs_seismic_feed"`).
+  * Direct Custom API Tools: If any custom tools are listed below under AVAILABLE TOOLS (prefixed with `fetch_custom_`), invoke them directly to acquire live vector feature layers.
   * Remote Model Context Protocol (MCP) Tools: If any MCP tools are listed below under AVAILABLE TOOLS (prefixed with `mcp_`), invoke them directly with their documented parameters.
 - **Missing Data & Precision Protocol**:
   * If a query asks for high-precision modeling that requires datasets absent from workspace (e.g. sub-meter LiDAR DEM, SWMM drainage pipe networks, live traffic feeds), YOU MUST invoke `request_additional_data(dataset_type, required_format, reason)` to officially prompt the user for the missing layer rather than guessing!

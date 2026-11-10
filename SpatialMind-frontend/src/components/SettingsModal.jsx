@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Key, ShieldCheck, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff,
-  Cpu, ExternalLink, Lock, Globe, Server, Plus, Trash2, RefreshCw, Check
+  Cpu, ExternalLink, Lock, Globe, Server, Plus, Trash2, RefreshCw, Check,
+  BookOpen, Terminal, Code, CheckCircle, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { api } from '../api/api.js';
 
 export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
-  const [activeTab, setActiveTab] = useState('llm'); // 'llm' | 'apis' | 'mcp'
+  const [activeTab, setActiveTab] = useState('llm'); // 'llm' | 'apis' | 'custom' | 'mcp'
 
   // LLM State
   const [provider, setProvider] = useState('groq');
@@ -22,6 +23,27 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
   const [apiShowKeys, setApiShowKeys] = useState({});
   const [apiLoading, setApiLoading] = useState({});
   const [apiStatusMessage, setApiStatusMessage] = useState(null);
+
+  // Custom Data APIs State
+  const [customApis, setCustomApis] = useState([]);
+  const [specGuide, setSpecGuide] = useState(null);
+  const [showSpecGuide, setShowSpecGuide] = useState(false);
+  const [showAddCustom, setShowAddCustom] = useState(false);
+  const [customLoading, setCustomLoading] = useState(false);
+  const [validatingCustom, setValidatingCustom] = useState(false);
+  const [customValidationResult, setCustomValidationResult] = useState(null);
+  const [customStatusMessage, setCustomStatusMessage] = useState(null);
+  const [newCustom, setNewCustom] = useState({
+    name: '',
+    url: '',
+    method: 'GET',
+    auth_type: 'none',
+    auth_key: '',
+    auth_value: '',
+    response_format: 'geojson_feature_collection',
+    description: '',
+    enabled: true
+  });
 
   // MCP Servers State
   const [mcpServers, setMcpServers] = useState([]);
@@ -59,14 +81,24 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
         setMcpServers(res.data?.mcp_servers || []);
       })
       .catch((err) => console.warn('[SettingsModal] Failed to fetch integrations:', err));
+
+    // 3. Fetch custom APIs & spec guide
+    api.get('/api/settings/custom-apis')
+      .then((res) => {
+        setCustomApis(res.data?.apis || []);
+        setSpecGuide(res.data?.guide || null);
+      })
+      .catch((err) => console.warn('[SettingsModal] Failed to fetch custom APIs:', err));
   };
 
   useEffect(() => {
     if (isOpen) {
       setStatusMessage(null);
       setApiStatusMessage(null);
+      setCustomStatusMessage(null);
       setMcpStatusMessage(null);
       setApiKey('');
+      setCustomValidationResult(null);
       fetchInitialData();
     }
   }, [isOpen]);
@@ -127,7 +159,6 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
       setApiStatusMessage({ type: 'success', text: res.data?.message || 'Key saved successfully.' });
       setApiInputs((prev) => ({ ...prev, [serviceKey]: '' }));
 
-      // Refresh integrations data
       const refresh = await api.get('/api/settings/integrations');
       setIntegrationsData(refresh.data?.apis || {});
     } catch (err) {
@@ -135,6 +166,109 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
       setApiStatusMessage({ type: 'error', text: detail });
     } finally {
       setApiLoading((prev) => ({ ...prev, [serviceKey]: false }));
+    }
+  };
+
+  // --- Custom Data API Actions ---
+  const handleValidateCustomEndpoint = async () => {
+    if (!newCustom.url.trim()) {
+      setCustomStatusMessage({ type: 'error', text: 'Endpoint URL is required for validation.' });
+      return;
+    }
+
+    setValidatingCustom(true);
+    setCustomValidationResult(null);
+    setCustomStatusMessage(null);
+
+    try {
+      const res = await api.post('/api/settings/custom-apis/validate', {
+        url: newCustom.url.trim(),
+        method: newCustom.method,
+        auth_type: newCustom.auth_type,
+        auth_key: newCustom.auth_key?.trim() || '',
+        auth_value: newCustom.auth_value?.trim() || '',
+        response_format: newCustom.response_format
+      });
+
+      setCustomValidationResult(res.data);
+      if (res.data?.is_valid) {
+        setCustomStatusMessage({
+          type: 'success',
+          text: res.data.message || 'Endpoint strictly satisfies the SpatialMind format specification.'
+        });
+      } else {
+        setCustomStatusMessage({
+          type: 'error',
+          text: res.data.error || 'Endpoint validation failed against format specification.'
+        });
+      }
+    } catch (err) {
+      setCustomStatusMessage({
+        type: 'error',
+        text: err.response?.data?.detail || err.message || 'Validation request failed.'
+      });
+    } finally {
+      setValidatingCustom(false);
+    }
+  };
+
+  const handleSaveCustomApi = async (e) => {
+    e.preventDefault();
+    if (!newCustom.name.trim() || !newCustom.url.trim()) {
+      setCustomStatusMessage({ type: 'error', text: 'API Name and Endpoint URL are required.' });
+      return;
+    }
+
+    setCustomLoading(true);
+    setCustomStatusMessage(null);
+
+    try {
+      const res = await api.post('/api/settings/custom-apis', newCustom);
+      setCustomStatusMessage({
+        type: 'success',
+        text: res.data?.message || 'Custom API registered and AI tool dynamically generated.'
+      });
+      setNewCustom({
+        name: '',
+        url: '',
+        method: 'GET',
+        auth_type: 'none',
+        auth_key: '',
+        auth_value: '',
+        response_format: 'geojson_feature_collection',
+        description: '',
+        enabled: true
+      });
+      setShowAddCustom(false);
+      setCustomValidationResult(null);
+
+      const refresh = await api.get('/api/settings/custom-apis');
+      setCustomApis(refresh.data?.apis || []);
+    } catch (err) {
+      setCustomStatusMessage({
+        type: 'error',
+        text: err.response?.data?.detail || err.message || 'Failed to save custom API.'
+      });
+    } finally {
+      setCustomLoading(false);
+    }
+  };
+
+  const handleToggleCustomApi = async (apiId, currentEnabled) => {
+    try {
+      await api.post(`/api/settings/custom-apis/${apiId}/toggle`, { enabled: !currentEnabled });
+      setCustomApis((prev) => prev.map((a) => (a.id === apiId ? { ...a, enabled: !currentEnabled } : a)));
+    } catch (err) {
+      console.error('Failed to toggle custom API:', err);
+    }
+  };
+
+  const handleDeleteCustomApi = async (apiId) => {
+    try {
+      await api.delete(`/api/settings/custom-apis/${apiId}`);
+      setCustomApis((prev) => prev.filter((a) => a.id !== apiId));
+    } catch (err) {
+      console.error('Failed to delete custom API:', err);
     }
   };
 
@@ -227,16 +361,16 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs">
+            <div className="p-2 rounded-xl bg-slate-900 text-cyan-400 shadow-xs">
               <Key className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">System Settings & Integrations</h3>
-              <p className="text-[11px] text-slate-500">Configure AI models, external geospatial APIs, and MCP servers</p>
+              <h3 className="text-sm font-bold text-slate-900">System Settings & Data Integrations</h3>
+              <p className="text-[11px] text-slate-500">Configure AI inference, standard geospatial APIs, custom feeds, and MCP servers</p>
             </div>
           </div>
 
@@ -249,11 +383,11 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1 px-6 pt-3 border-b border-slate-100 bg-white flex-shrink-0">
+        <div className="flex items-center gap-1 px-6 pt-3 border-b border-slate-100 bg-white flex-shrink-0 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('llm')}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'llm'
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -266,20 +400,38 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
           <button
             type="button"
             onClick={() => setActiveTab('apis')}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'apis'
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <Globe className="h-3.5 w-3.5" />
-            <span>Geospatial APIs</span>
+            <span>Standard APIs</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('custom')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'custom'
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Code className="h-3.5 w-3.5" />
+            <span>Custom Data APIs</span>
+            {customApis.filter((a) => a.enabled).length > 0 && (
+              <span className="text-[10px] bg-cyan-100 text-cyan-800 font-bold px-1.5 py-0.2 rounded-full">
+                {customApis.filter((a) => a.enabled).length} Ready
+              </span>
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('mcp')}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'mcp'
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -304,7 +456,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
             <form onSubmit={handleSaveLLM} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-2">
-                  Select AI Reasoning Provider
+                  Select AI Reasoning Engine
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {[
@@ -397,7 +549,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-2.5 text-slate-500 text-[11px]">
                 <Lock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
                 <p className="leading-relaxed">
-                  <strong>Secure Storage:</strong> Credentials are verified and saved directly into your protected local backend configuration. Plaintext keys are never logged or exposed.
+                  <strong>Protected Storage:</strong> Credentials are saved in your local backend environment. Plaintext keys are never logged or exposed in telemetry.
                 </p>
               </div>
 
@@ -405,7 +557,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors disabled:opacity-60 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-xs transition-colors disabled:opacity-60 cursor-pointer"
                 >
                   {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                   <span>{loading ? 'Verifying Key...' : 'Save & Verify Key'}</span>
@@ -415,12 +567,12 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
           )}
 
           {/* ============================================================== */}
-          {/* TAB 2: GEOSPATIAL APIS                                         */}
+          {/* TAB 2: STANDARD GEOSPATIAL APIS                                */}
           {/* ============================================================== */}
           {activeTab === 'apis' && (
             <div className="space-y-4">
               <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-100 text-xs text-indigo-900 leading-relaxed">
-                Connect external geospatial telemetry providers. When configured, the AI agent can autonomously invoke tools like <code>fetch_nasa_firms_hotspots</code>, <code>fetch_openaq_stations</code>, <code>fetch_openweather_telemetry</code>, and <code>fetch_mapbox_isochrone</code>.
+                Connect external geospatial telemetry providers. When configured, tools like <code>fetch_nasa_firms_hotspots</code>, <code>fetch_openaq_stations</code>, <code>fetch_openweather_telemetry</code>, and <code>fetch_mapbox_isochrone</code> are unlocked for the engine.
               </div>
 
               {apiStatusMessage && (
@@ -543,7 +695,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                           type="button"
                           disabled={isLoadingKey || !(apiInputs[item.id] || '').trim()}
                           onClick={() => handleSaveApiKey(item.id)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center gap-1 cursor-pointer flex-shrink-0"
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 transition-colors flex items-center gap-1 cursor-pointer flex-shrink-0"
                         >
                           {isLoadingKey ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
                           <span>Save</span>
@@ -566,7 +718,350 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
           )}
 
           {/* ============================================================== */}
-          {/* TAB 3: MCP SERVERS (MODEL CONTEXT PROTOCOL)                     */}
+          {/* TAB 3: UNIVERSAL CUSTOM DATA APIS                              */}
+          {/* ============================================================== */}
+          {activeTab === 'custom' && (
+            <div className="space-y-4">
+              {/* Integration Guide Accordion / Banner */}
+              <div className="rounded-xl border border-cyan-200 bg-cyan-50/40 p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-cyan-700" />
+                    <h4 className="text-xs font-bold text-cyan-950">Universal Data API Integration Specification</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSpecGuide(!showSpecGuide)}
+                    className="text-xs font-semibold text-cyan-800 hover:text-cyan-950 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{showSpecGuide ? 'Hide Specifications' : 'View Output Format Guide'}</span>
+                    {showSpecGuide ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-cyan-900 leading-relaxed">
+                  Any external REST endpoint can be integrated into the system. The endpoint's response payload must resolve to one of the three standard SpatialMind specifications to be ingested, converted to GeoPandas, and displayed on the map.
+                </p>
+
+                {showSpecGuide && specGuide && (
+                  <div className="mt-3 pt-3 border-t border-cyan-200 space-y-3 text-xs">
+                    {specGuide.formats?.map((fmt) => (
+                      <div key={fmt.format_id} className="p-3 rounded-lg bg-white border border-cyan-100 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 text-xs">{fmt.name}</span>
+                          <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                            {fmt.format_id}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-relaxed">{fmt.description}</p>
+                        <pre className="p-2 rounded bg-slate-900 text-cyan-300 font-mono text-[10px] overflow-x-auto">
+                          {JSON.stringify(fmt.example, null, 2)}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Status Message */}
+              {customStatusMessage && (
+                <div className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
+                  customStatusMessage.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                }`}>
+                  {customStatusMessage.type === 'success' ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <span className="leading-relaxed">{customStatusMessage.text}</span>
+                </div>
+              )}
+
+              {/* Action Bar */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Registered Custom Data APIs</h4>
+                  <p className="text-[11px] text-slate-500">Each active API automatically registers a dynamic tool for the AI agent</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustom(!showAddCustom)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-xs transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Connect Custom API</span>
+                </button>
+              </div>
+
+              {/* Add Custom API Form */}
+              {showAddCustom && (
+                <form onSubmit={handleSaveCustomApi} className="p-4 rounded-xl border border-cyan-200 bg-cyan-50/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-900">Connect New Spatial Data API</h4>
+                    <span className="text-[10px] text-slate-500 font-mono">Dynamic AI Tool Generator</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">API Display Name</label>
+                      <input
+                        type="text"
+                        value={newCustom.name}
+                        onChange={(e) => setNewCustom({ ...newCustom, name: e.target.value })}
+                        placeholder="e.g. City Sensor Stream"
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white focus:ring-1 focus:ring-cyan-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Expected Output Format</label>
+                      <select
+                        value={newCustom.response_format}
+                        onChange={(e) => setNewCustom({ ...newCustom, response_format: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white focus:ring-1 focus:ring-cyan-500"
+                      >
+                        <option value="geojson_feature_collection">GeoJSON FeatureCollection (Vector Features)</option>
+                        <option value="lat_lon_array">Record Array (Lat/Lon JSON Objects)</option>
+                        <option value="raster_geotiff">Cloud-Optimized GeoTIFF (.tif reference)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">Endpoint URL</label>
+                      <span className="text-[10px] text-slate-400">Must return declared format</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        value={newCustom.method}
+                        onChange={(e) => setNewCustom({ ...newCustom, method: e.target.value })}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono bg-white flex-shrink-0"
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                      </select>
+                      <input
+                        type="url"
+                        value={newCustom.url}
+                        onChange={(e) => setNewCustom({ ...newCustom, url: e.target.value })}
+                        placeholder="https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson"
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono bg-white focus:ring-1 focus:ring-cyan-500 flex-1"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Authentication Configuration */}
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Authentication</label>
+                      <select
+                        value={newCustom.auth_type}
+                        onChange={(e) => setNewCustom({ ...newCustom, auth_type: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white focus:ring-1 focus:ring-cyan-500"
+                      >
+                        <option value="none">None (Public)</option>
+                        <option value="bearer">Bearer Token</option>
+                        <option value="header">Custom Header</option>
+                        <option value="query_param">Query Parameter</option>
+                      </select>
+                    </div>
+
+                    {newCustom.auth_type === 'header' && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Header Name</label>
+                        <input
+                          type="text"
+                          value={newCustom.auth_key}
+                          onChange={(e) => setNewCustom({ ...newCustom, auth_key: e.target.value })}
+                          placeholder="e.g. X-API-Key"
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono bg-white"
+                        />
+                      </div>
+                    )}
+
+                    {newCustom.auth_type === 'query_param' && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Parameter Key</label>
+                        <input
+                          type="text"
+                          value={newCustom.auth_key}
+                          onChange={(e) => setNewCustom({ ...newCustom, auth_key: e.target.value })}
+                          placeholder="e.g. apikey"
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono bg-white"
+                        />
+                      </div>
+                    )}
+
+                    {newCustom.auth_type !== 'none' && (
+                      <div className={newCustom.auth_type === 'bearer' ? 'col-span-2' : ''}>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Secret / Token Value</label>
+                        <input
+                          type="password"
+                          value={newCustom.auth_value}
+                          onChange={(e) => setNewCustom({ ...newCustom, auth_value: e.target.value })}
+                          placeholder="Secret token value"
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono bg-white"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Feed Description (Guides the AI on when to call this feed)</label>
+                    <input
+                      type="text"
+                      value={newCustom.description}
+                      onChange={(e) => setNewCustom({ ...newCustom, description: e.target.value })}
+                      placeholder="e.g. Real-time seismic vibration telemetry, magnitude 4.5+ worldwide"
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                    />
+                  </div>
+
+                  {/* Endpoint Live Validation Drawer */}
+                  {customValidationResult && (
+                    <div className={`p-3 rounded-lg border text-xs space-y-1 ${
+                      customValidationResult.is_valid
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                        : 'bg-red-50 border-red-200 text-red-900'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold">
+                          {customValidationResult.is_valid ? 'Validation Passed' : 'Format Validation Failed'}
+                        </span>
+                        {customValidationResult.feature_count !== undefined && (
+                          <span className="font-mono text-[11px]">
+                            {customValidationResult.feature_count} features ready
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] leading-relaxed">
+                        {customValidationResult.message || customValidationResult.error}
+                      </p>
+                      {customValidationResult.sample_attributes?.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <span className="text-[10px] text-slate-500 font-semibold">Attributes:</span>
+                          {customValidationResult.sample_attributes.map((attr, i) => (
+                            <span key={i} className="font-mono text-[10px] bg-white px-1.5 py-0.2 rounded border border-slate-200">
+                              {attr}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={handleValidateCustomEndpoint}
+                      disabled={validatingCustom || !newCustom.url.trim()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-100 text-cyan-900 hover:bg-cyan-200 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {validatingCustom ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      <span>{validatingCustom ? 'Validating against format...' : 'Validate Endpoint Format'}</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowAddCustom(false); setCustomValidationResult(null); }}
+                        className="px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-slate-100 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={customLoading}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-60 cursor-pointer"
+                      >
+                        {customLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                        <span>Register API & Tool</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {/* List of Custom APIs */}
+              <div className="space-y-3">
+                {customApis.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400 text-xs border border-dashed rounded-xl">
+                    No custom data APIs connected yet. Click "Connect Custom API" above to integrate any REST spatial feed.
+                  </div>
+                ) : (
+                  customApis.map((apiItem) => (
+                    <div
+                      key={apiItem.id}
+                      className={`p-3.5 rounded-xl border transition-all ${
+                        apiItem.enabled
+                          ? 'border-slate-200 bg-white'
+                          : 'border-slate-200 bg-slate-50/70 opacity-75'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-slate-900">{apiItem.name}</h4>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-cyan-50 text-cyan-800 border border-cyan-200 uppercase">
+                              {apiItem.response_format?.replace('_', ' ') || 'GeoJSON'}
+                            </span>
+                            <span className={`text-[10px] font-semibold px-2 py-0.2 rounded-full ${
+                              apiItem.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {apiItem.enabled ? 'Active' : 'Disabled'}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-500 font-mono mt-1 break-all">{apiItem.url}</p>
+                          {apiItem.description && (
+                            <p className="text-[11px] text-slate-600 mt-0.5">{apiItem.description}</p>
+                          )}
+
+                          <div className="mt-2 flex items-center gap-2 text-[10px]">
+                            <span className="text-slate-400">AI Tool Callable:</span>
+                            <span className="font-mono bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold border border-slate-200">
+                              `fetch_custom_{apiItem.id}` or `query_custom_data_api(api_id="{apiItem.id}")`
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCustomApi(apiItem.id, apiItem.enabled)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                              apiItem.enabled
+                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                            }`}
+                          >
+                            {apiItem.enabled ? 'Disable' : 'Enable'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomApi(apiItem.id)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer transition-colors"
+                            title="Delete Custom API"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* TAB 4: MCP SERVERS (MODEL CONTEXT PROTOCOL)                     */}
           {/* ============================================================== */}
           {activeTab === 'mcp' && (
             <div className="space-y-4">
@@ -577,7 +1072,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 <button
                   type="button"
                   onClick={() => setShowAddMcp(!showAddMcp)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors flex-shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-xs transition-colors flex-shrink-0 cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Add MCP Server</span>
@@ -663,7 +1158,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                     <button
                       type="submit"
                       disabled={mcpLoading}
-                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 cursor-pointer flex items-center gap-1"
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-60 cursor-pointer flex items-center gap-1"
                     >
                       {mcpLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                       <span>Save Server</span>
@@ -712,7 +1207,6 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                           </div>
 
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            {/* Toggle Button */}
                             <button
                               type="button"
                               onClick={() => handleToggleMcpServer(server.id, server.enabled)}
@@ -725,7 +1219,6 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                               {server.enabled ? 'Disable' : 'Enable'}
                             </button>
 
-                            {/* Test Connection Button */}
                             <button
                               type="button"
                               onClick={() => handleTestMcpServer(server)}
@@ -736,7 +1229,6 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                               <span>Test</span>
                             </button>
 
-                            {/* Delete Button */}
                             <button
                               type="button"
                               onClick={() => handleDeleteMcpServer(server.id)}
@@ -782,7 +1274,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
         {/* Footer */}
         <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between flex-shrink-0">
           <span className="text-[11px] text-slate-400">
-            SpatialMind Intelligence Hub &middot; Zero telemetry leakage
+            SpatialMind Enterprise Engine &middot; Real-time dynamic tool generation
           </span>
           <button
             type="button"

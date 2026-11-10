@@ -1,0 +1,15 @@
+[
+  {
+    "id": "usgs_seismic_feed",
+    "name": "USGS Global Earthquake Feed",
+    "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4.5&limit=25",
+    "method": "GET",
+    "auth_type": "none",
+    "auth_key": "",
+    "auth_value": "",
+    "response_format": "geojson_feature_collection",
+    "description": "Real-time global seismic monitoring telemetry for tectonic hazards (M4.5+)",
+    "enabled": true,
+    "default_params": {}
+  }
+]

@@ -411,3 +411,108 @@ def test_mcp_server(req: MCPTestRequest):
 
     result = MCPService.test_connection(req.url, req.transport, req.custom_headers)
     return result
+
+
+# ==============================================================================
+# UNIVERSAL CUSTOM DATA API INTEGRATIONS & SPECIFICATION GUIDE
+# ==============================================================================
+
+from app.services.custom_api_service import CustomAPIService
+
+class CustomAPIRequest(BaseModel):
+    id: Optional[str] = None
+    name: str = Field(..., description="Human-readable name of the custom API")
+    url: str = Field(..., description="Target endpoint URL")
+    method: str = Field(default="GET", description="HTTP method: 'GET' or 'POST'")
+    auth_type: str = Field(default="none", description="Authentication type: 'none', 'bearer', 'header', or 'query_param'")
+    auth_key: Optional[str] = Field(default="", description="Header or query parameter key name (e.g. 'X-API-KEY')")
+    auth_value: Optional[str] = Field(default="", description="API key or token string")
+    response_format: str = Field(default="geojson_feature_collection", description="Format: 'geojson_feature_collection', 'lat_lon_array', or 'raster_geotiff'")
+    description: Optional[str] = Field(default="", description="Description of the data feed")
+    enabled: bool = Field(default=True, description="Whether the API is enabled for AI agent discovery")
+    default_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Default query parameters")
+
+class CustomAPIToggleRequest(BaseModel):
+    enabled: bool
+
+class CustomAPIValidateRequest(BaseModel):
+    url: str = Field(..., description="Endpoint URL to validate")
+    method: str = Field(default="GET", description="HTTP method")
+    auth_type: str = Field(default="none", description="Authentication type")
+    auth_key: Optional[str] = Field(default="", description="Auth key name")
+    auth_value: Optional[str] = Field(default="", description="Auth token/key")
+    response_format: str = Field(default="geojson_feature_collection", description="Expected format specification")
+    query_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Test query parameters")
+
+
+@router.get("/custom-apis", response_model=Dict[str, Any])
+def get_custom_apis_and_guide():
+    """
+    Returns all configured custom data APIs along with the official integration format specification guide.
+    """
+    apis = CustomAPIService.list_apis()
+    guide = CustomAPIService.get_specification_guide()
+    return {
+        "apis": apis,
+        "guide": guide,
+        "count": len(apis)
+    }
+
+
+@router.post("/custom-apis", status_code=status.HTTP_200_OK)
+def save_custom_api(req: CustomAPIRequest):
+    """
+    Registers or updates an external custom data API.
+    """
+    saved = CustomAPIService.save_api(req.dict())
+    return {
+        "status": "success",
+        "message": f"Custom API '{saved.get('name')}' registered successfully.",
+        "api": saved
+    }
+
+
+@router.delete("/custom-apis/{api_id}")
+def delete_custom_api(api_id: str):
+    """Deletes a custom API configuration."""
+    success = CustomAPIService.delete_api(api_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Custom API '{api_id}' not found.")
+    return {
+        "status": "success",
+        "message": f"Custom API '{api_id}' deleted."
+    }
+
+
+@router.post("/custom-apis/{api_id}/toggle")
+def toggle_custom_api(api_id: str, req: CustomAPIToggleRequest):
+    """Enables or disables a custom API."""
+    success = CustomAPIService.toggle_api(api_id, req.enabled)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Custom API '{api_id}' not found.")
+    return {
+        "status": "success",
+        "message": f"Custom API '{api_id}' {'enabled' if req.enabled else 'disabled'}.",
+        "enabled": req.enabled
+    }
+
+
+@router.post("/custom-apis/validate")
+def validate_custom_api_endpoint(req: CustomAPIValidateRequest):
+    """
+    Pings any external API endpoint and verifies that its payload strictly matches
+    the declared SpatialMind format specification (GeoJSON, Lat/Lon array, or GeoTIFF).
+    """
+    if not req.url:
+        raise HTTPException(status_code=400, detail="Target URL is required for validation.")
+
+    report = CustomAPIService.validate_and_test_api(
+        url=req.url,
+        method=req.method,
+        auth_type=req.auth_type,
+        auth_key=req.auth_key,
+        auth_value=req.auth_value,
+        expected_format=req.response_format,
+        query_params=req.query_params
+    )
+    return report

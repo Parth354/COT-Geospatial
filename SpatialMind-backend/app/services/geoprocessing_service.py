@@ -58,6 +58,39 @@ class ToolExecutor:
         except Exception as e:
             logger.warning(f"Notice: MCP tool discovery skipped or failed: {e}")
 
+        # Discover and register universal & dynamic tools from configured Custom Data APIs
+        try:
+            from app.services.custom_api_service import CustomAPIService
+
+            def query_custom_data_api(api_id: str, query_params: Optional[Dict[str, Any]] = None, output_name: str = "custom_api_layer"):
+                """
+                Queries any registered external data API by its api_id, dynamically applies query parameters,
+                validates that the returned payload satisfies the GeoJSON or record array format specification,
+                and adds the resulting spatial layer to the map state.
+
+                Args:
+                    api_id (str): Unique identifier of the registered custom API (e.g., 'usgs_seismic_feed').
+                    query_params (dict, optional): Key-value query parameters to pass to the endpoint.
+                    output_name (str): The name to assign to the loaded spatial layer in memory.
+
+                Returns:
+                    GeoDataFrame containing the extracted features.
+                """
+                return CustomAPIService.execute_api(api_id, query_params, output_name)
+
+            self.tools['query_custom_data_api'] = query_custom_data_api
+            self.tool_docstrings['query_custom_data_api'] = {"description": inspect.cleandoc(query_custom_data_api.__doc__)}
+
+            # Also register dedicated named tools for each enabled custom API
+            custom_tools = CustomAPIService.get_dynamic_api_tools()
+            for c_name, (c_func, c_doc) in custom_tools.items():
+                self.tools[c_name] = c_func
+                self.tool_docstrings[c_name] = {"description": c_doc}
+            if custom_tools:
+                logger.info(f"Dynamically registered {len(custom_tools)} custom API tool(s) into ToolExecutor.")
+        except Exception as e:
+            logger.warning(f"Notice: Custom API tool discovery skipped or failed: {e}")
+
     def register_tool(self, tool_name: str, tool_function: Callable, description: str):
         """Dynamically registers a new tool, such as a web search tool."""
         if tool_name in self.tools:
