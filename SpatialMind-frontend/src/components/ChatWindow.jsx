@@ -7,7 +7,7 @@ import webSocketService from '../socket/websocket.js';
 import { useAppContext } from '../hooks/AppContext';
 import Message from './Message.jsx';
 import { queryAPI } from '../api/queryAPI.js';
-import { sessionAPI } from '../api/api.js';
+import { api, sessionAPI } from '../api/api.js';
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -49,15 +49,36 @@ function ChatWindow() {
   } = state;
 
   const [inputMessage, setInputMessage] = useState('');
+  const [isConfigured, setIsConfigured] = useState(true);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    api.get('/api/settings/keys')
+      .then((res) => {
+        if (res.data && res.data.is_configured !== undefined) {
+          setIsConfigured(Boolean(res.data.is_configured));
+        }
+      })
+      .catch((err) => console.warn('Could not check key status:', err));
+  }, [state.isSettingsOpen]);
+
   const executeQuery = async (queryText) => {
     const trimmed = queryText.trim();
     if (!trimmed || isAgentLoading || !websocketConnected) return;
+
+    if (!isConfigured) {
+      actions.openSettings();
+      actions.addNotification({
+        type: 'warning',
+        title: 'API Key Required',
+        message: 'Please select a provider and enter your API key to run AI spatial queries.'
+      });
+      return;
+    }
 
     actions.addUserMessage(trimmed);
     setInputMessage('');
@@ -121,6 +142,25 @@ function ChatWindow() {
           </button>
         )}
       </header>
+
+      {/* AI Key Configuration Banner */}
+      {!isConfigured && (
+        <div className="mx-3 mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200/90 text-xs flex items-center justify-between gap-2.5 text-amber-950 shadow-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <span className="text-[11px] leading-tight text-amber-900 truncate sm:whitespace-normal">
+              No AI inference key configured. Add your key to run queries.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => actions.openSettings()}
+            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-[11px] whitespace-nowrap transition-colors cursor-pointer flex-shrink-0"
+          >
+            Settings
+          </button>
+        </div>
+      )}
 
       {/* Messages Scroll Area */}
       <main className="flex-1 overflow-y-auto p-4 space-y-4 min-w-0">

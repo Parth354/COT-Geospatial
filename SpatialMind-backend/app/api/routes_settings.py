@@ -65,38 +65,41 @@ def _mask_key(key: str) -> str:
 
 def _update_env_file(key_name: str, new_value: str, provider: str, model: Optional[str] = None):
     """Safely updates or appends environment variables in .env without wiping other keys."""
-    if not ENV_PATH.exists():
-        ENV_PATH.write_text("", encoding="utf-8")
+    try:
+        if not ENV_PATH.exists():
+            ENV_PATH.write_text("", encoding="utf-8")
 
-    lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
-    found_key = False
-    found_provider = False
-    found_model = False
-    new_lines = []
+        lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
+        found_key = False
+        found_provider = False
+        found_model = False
+        new_lines = []
 
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith(f"{key_name}="):
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(f"{key_name}="):
+                new_lines.append(f"{key_name}={new_value.strip()}")
+                found_key = True
+            elif stripped.startswith("LLM_PROVIDER="):
+                new_lines.append(f"LLM_PROVIDER={provider.strip()}")
+                found_provider = True
+            elif model and stripped.startswith("LLM_MODEL="):
+                new_lines.append(f"LLM_MODEL={model.strip()}")
+                found_model = True
+            else:
+                new_lines.append(line)
+
+        if not found_key and key_name:
             new_lines.append(f"{key_name}={new_value.strip()}")
-            found_key = True
-        elif stripped.startswith("LLM_PROVIDER="):
+        if not found_provider:
             new_lines.append(f"LLM_PROVIDER={provider.strip()}")
-            found_provider = True
-        elif model and stripped.startswith("LLM_MODEL="):
+        if model and not found_model:
             new_lines.append(f"LLM_MODEL={model.strip()}")
-            found_model = True
-        else:
-            new_lines.append(line)
 
-    if not found_key and key_name:
-        new_lines.append(f"{key_name}={new_value.strip()}")
-    if not found_provider:
-        new_lines.append(f"LLM_PROVIDER={provider.strip()}")
-    if model and not found_model:
-        new_lines.append(f"LLM_MODEL={model.strip()}")
-
-    ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-    logger.info(f"Securely updated {key_name} in .env file.")
+        ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        logger.info(f"Securely updated {key_name} in .env file.")
+    except Exception as e:
+        logger.warning(f"Could not persist to .env file (container environment may have read-only disk): {e}")
 
 def _test_key(provider: str, api_key: str, model: Optional[str] = None) -> bool:
     """Verifies that the provided API key is accepted by the remote provider."""
