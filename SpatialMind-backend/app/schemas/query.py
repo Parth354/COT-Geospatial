@@ -15,7 +15,7 @@ class QueryRequest(BaseModel):
     query: str
     session_id: str
     context: Optional[QueryContext] = None
-    model_type: Optional[str] = 'mistral'
+    model_type: Optional[str] = 'gemini'
 
 class QueryResponse(BaseModel):
     job_id: str

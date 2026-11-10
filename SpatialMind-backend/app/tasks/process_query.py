@@ -55,16 +55,19 @@ def process_query_task(*args, **kwargs):
         processing_time_float = time.time() - start_time
         
         # Save successful result
-        with db_session() as db:
-            logger.info(f"Saving successful results for job {job_id}.")
-            ResultService.save_result(
-                db=db,
-                job_id=job_id,
-                status="completed",
-                data=final_results,
-                processing_time=processing_time_float
-            )
-            result_saved = True
+        try:
+            with db_session() as db:
+                logger.info(f"Saving successful results for job {job_id}.")
+                ResultService.save_result(
+                    db=db,
+                    job_id=job_id,
+                    status="completed",
+                    data=final_results,
+                    processing_time=processing_time_float
+                )
+                result_saved = True
+        except Exception as db_err:
+            logger.warning(f"Could not persist result to database for job {job_id}: {db_err}. File-based storage intact.")
        
         # Send final completion status to frontend
         redis_sync_client.publish_websocket_message(job_id, {

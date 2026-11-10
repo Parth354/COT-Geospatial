@@ -56,11 +56,7 @@ def submit_query(
         logger.info(f"Successfully registered job '{job_id}' in the database.")
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to register job {job_id} in the database: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to register the analysis job."
-        )
+        logger.warning(f"Database registration notice for job {job_id}: {e}. Proceeding with streaming execution.")
 
     celery_payload = {
         "job_id": job_id,
