@@ -18,7 +18,7 @@ router = APIRouter(prefix="/settings", tags=["Settings"])
 ENV_PATH = BACKEND_ROOT / ".env"
 
 class KeyUpdateRequest(BaseModel):
-    provider: str = Field(..., description="Provider name: 'groq', 'gemini', 'openai', or 'ollama'")
+    provider: str = Field(..., description="Provider name: 'anthropic', 'gemini', 'groq', 'openai', or 'ollama'")
     api_key: str = Field(default="", description="The API key string (optional for ollama)")
     model: Optional[str] = Field(default=None, description="Optional model identifier override")
 
@@ -30,12 +30,40 @@ class KeyStatusResponse(BaseModel):
 
 BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
+AVAILABLE_MODELS = {
+    "anthropic": [
+        {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet", "badge": "Recommended", "desc": "High accuracy spatial reasoning & planning"},
+        {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku", "badge": "Ultra Fast", "desc": "Lightweight & fast inference"},
+        {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus", "badge": "Deep Reasoning", "desc": "Complex multi-variable analysis"}
+    ],
+    "gemini": [
+        {"id": "gemini-3.5-flash-lite", "name": "Gemini Flash Lite", "badge": "Recommended", "desc": "Ultra resilient, zero throttling"},
+        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "badge": "Latest", "desc": "Fast multimodal reasoning"},
+        {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "badge": "Pro", "desc": "Long context & complex synthesis"}
+    ],
+    "groq": [
+        {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "badge": "Recommended", "desc": "Free, open-weights, high speed"},
+        {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B", "badge": "Instant", "desc": "Sub-second token latency"},
+        {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "badge": "MoE", "desc": "32k context MoE architecture"}
+    ],
+    "openai": [
+        {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "badge": "Recommended", "desc": "Fast & cost effective"},
+        {"id": "gpt-4o", "name": "GPT-4o", "badge": "Flagship", "desc": "Omnimodal frontier intelligence"},
+        {"id": "o3-mini", "name": "o3-mini", "badge": "Reasoning", "desc": "Advanced multi-step reasoning"}
+    ],
+    "ollama": [
+        {"id": "mistral", "name": "Mistral 7B", "badge": "Local", "desc": "Balanced local offline model"},
+        {"id": "llama3", "name": "Llama 3", "badge": "Local", "desc": "Meta open weights on local GPU"},
+        {"id": "qwen2.5", "name": "Qwen 2.5", "badge": "Local", "desc": "Multilingual spatial coding model"}
+    ]
+}
+
 def _mask_key(key: str) -> str:
     if not key or len(key) < 8:
         return "Not configured"
     return f"{key[:4]}••••••••{key[-4:]}"
 
-def _update_env_file(key_name: str, new_value: str, provider: str):
+def _update_env_file(key_name: str, new_value: str, provider: str, model: Optional[str] = None):
     """Safely updates or appends environment variables in .env without wiping other keys."""
     if not ENV_PATH.exists():
         ENV_PATH.write_text("", encoding="utf-8")
@@ -43,6 +71,7 @@ def _update_env_file(key_name: str, new_value: str, provider: str):
     lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
     found_key = False
     found_provider = False
+    found_model = False
     new_lines = []
 
     for line in lines:
@@ -53,6 +82,9 @@ def _update_env_file(key_name: str, new_value: str, provider: str):
         elif stripped.startswith("LLM_PROVIDER="):
             new_lines.append(f"LLM_PROVIDER={provider.strip()}")
             found_provider = True
+        elif model and stripped.startswith("LLM_MODEL="):
+            new_lines.append(f"LLM_MODEL={model.strip()}")
+            found_model = True
         else:
             new_lines.append(line)
 
@@ -60,6 +92,8 @@ def _update_env_file(key_name: str, new_value: str, provider: str):
         new_lines.append(f"{key_name}={new_value.strip()}")
     if not found_provider:
         new_lines.append(f"LLM_PROVIDER={provider.strip()}")
+    if model and not found_model:
+        new_lines.append(f"LLM_MODEL={model.strip()}")
 
     ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
     logger.info(f"Securely updated {key_name} in .env file.")
@@ -75,8 +109,19 @@ def _test_key(provider: str, api_key: str, model: Optional[str] = None) -> bool:
     cleaned_key = api_key.strip()
 
     try:
-        if provider == "groq":
-            # Using models list endpoint with browser User-Agent to prevent Cloudflare anti-bot blocks
+        if provider == "anthropic":
+            url = "https://api.anthropic.com/v1/models"
+            headers = {
+                "x-api-key": cleaned_key,
+                "anthropic-version": "2023-06-01",
+                "User-Agent": BROWSER_UA,
+                "Accept": "application/json"
+            }
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status == 200
+
+        elif provider == "groq":
             url = "https://api.groq.com/openai/v1/models"
             headers = {
                 "Authorization": f"Bearer {cleaned_key}",
@@ -135,20 +180,25 @@ def _test_key(provider: str, api_key: str, model: Optional[str] = None) -> bool:
 
 @router.get("/keys", response_model=Dict[str, Any])
 def get_key_status():
-    """Returns the current active provider and masked key indicators without exposing plaintext keys."""
+    """Returns the current active provider, active model, and masked key indicators."""
     active_provider = getattr(settings, "LLM_PROVIDER", "auto")
+    active_model = getattr(settings, "LLM_MODEL", "")
 
     # Resolve configured status per provider
     groq_k = getattr(settings, "GROQ_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
     gemini_k = getattr(settings, "GOOGLE_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
     openai_k = getattr(settings, "OPENAI_API_KEY", "") or os.environ.get("OPENAI_API_KEY", "")
+    anthropic_k = getattr(settings, "ANTHROPIC_API_KEY", "") or os.environ.get("ANTHROPIC_API_KEY", "")
 
     # Exclude known leaked demo key
     if gemini_k and gemini_k.startswith("AIzaSyA0TWhe__RsAwVAReUPzKZ5TCuUJPSmb-I"):
         gemini_k = ""
 
     current_key = ""
-    if active_provider == "groq" or (active_provider == "auto" and groq_k):
+    if active_provider == "anthropic" or (active_provider == "auto" and anthropic_k):
+        active_provider = "anthropic"
+        current_key = anthropic_k
+    elif active_provider == "groq" or (active_provider == "auto" and groq_k):
         active_provider = "groq"
         current_key = groq_k
     elif active_provider == "openai" or (active_provider == "auto" and openai_k):
@@ -161,15 +211,17 @@ def get_key_status():
         active_provider = "ollama"
         current_key = "local"
     else:
-        # Default to Groq if no provider is configured yet
         active_provider = "groq"
         current_key = groq_k
 
     return {
         "active_provider": active_provider,
+        "active_model": active_model,
         "is_configured": bool(current_key),
         "masked_key": _mask_key(current_key),
+        "available_models": AVAILABLE_MODELS,
         "providers": {
+            "anthropic": {"is_configured": bool(anthropic_k), "masked": _mask_key(anthropic_k)},
             "groq": {"is_configured": bool(groq_k), "masked": _mask_key(groq_k)},
             "gemini": {"is_configured": bool(gemini_k), "masked": _mask_key(gemini_k)},
             "openai": {"is_configured": bool(openai_k), "masked": _mask_key(openai_k)},
@@ -180,31 +232,46 @@ def get_key_status():
 @router.post("/keys", status_code=status.HTTP_200_OK)
 def update_api_key(req: KeyUpdateRequest):
     """
-    Securely updates the API key for the chosen provider.
+    Securely updates the API key and chosen model for the provider.
     Tests key authenticity, updates settings and .env, and refreshes the LLM instance cache.
     """
     provider = req.provider.lower().strip()
-    if provider not in ["groq", "gemini", "openai", "ollama"]:
+    if provider not in ["anthropic", "groq", "gemini", "openai", "ollama"]:
         raise HTTPException(status_code=400, detail=f"Unsupported provider: '{provider}'")
 
     api_key = req.api_key.strip()
-
-    # Verify key authenticity
-    _test_key(provider, api_key, req.model)
+    model = req.model.strip() if req.model else None
 
     # Determine environment variable key
     env_map = {
+        "anthropic": "ANTHROPIC_API_KEY",
         "groq": "GROQ_API_KEY",
         "gemini": "GOOGLE_API_KEY",
         "openai": "OPENAI_API_KEY"
     }
     env_var_name = env_map.get(provider, "")
 
+    # If key is empty, check if already configured in settings or environment
+    if not api_key and provider != "ollama":
+        existing_key = getattr(settings, env_var_name, "") or os.environ.get(env_var_name, "")
+        if existing_key:
+            api_key = existing_key
+        else:
+            raise HTTPException(status_code=400, detail=f"Please provide an API key for {provider.capitalize()}.")
+    elif api_key:
+        # Verify key authenticity when new key is provided
+        _test_key(provider, api_key, model)
+
     # Update in-memory settings
-    if env_var_name:
+    if env_var_name and api_key:
         setattr(settings, env_var_name, api_key)
         os.environ[env_var_name] = api_key
-        _update_env_file(env_var_name, api_key, provider)
+
+    if model:
+        setattr(settings, "LLM_MODEL", model)
+        os.environ["LLM_MODEL"] = model
+
+    _update_env_file(env_var_name, api_key, provider, model)
 
     settings.LLM_PROVIDER = provider
     os.environ["LLM_PROVIDER"] = provider
@@ -212,11 +279,12 @@ def update_api_key(req: KeyUpdateRequest):
     # Clear cached LLM instances so next request immediately uses the newly configured credentials
     llm_factory._llm_instances.clear()
 
-    logger.info(f"Successfully configured and verified {provider.capitalize()} API credentials.")
+    logger.info(f"Successfully configured and verified {provider.capitalize()} API credentials (model: {model or 'default'}).")
     return {
         "status": "success",
-        "message": f"{provider.capitalize()} API key securely saved and verified successfully.",
-        "active_provider": provider
+        "message": f"{provider.capitalize()} credentials securely configured and verified successfully.",
+        "active_provider": provider,
+        "active_model": model
     }
 
 

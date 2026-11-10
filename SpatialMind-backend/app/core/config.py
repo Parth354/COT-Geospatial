@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLM_PROVIDER: str = "auto"
+    LLM_MODEL: str = ""
     HUGGINGFACE_HUB_TOKEN: str = ""
     NASA_FIRMS_API_KEY: str = ""
     OPENAQ_API_KEY: str = ""

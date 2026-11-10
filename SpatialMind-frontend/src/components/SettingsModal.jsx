@@ -13,6 +13,9 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
   const [provider, setProvider] = useState('groq');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [customModel, setCustomModel] = useState('');
+  const [isCustomModel, setIsCustomModel] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
   const [keyStatus, setKeyStatus] = useState(null);
@@ -65,11 +68,27 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
     api.get('/api/settings/keys')
       .then((res) => {
         setKeyStatus(res.data);
-        const validProviders = ['groq', 'gemini', 'openai', 'ollama'];
-        if (res.data?.active_provider && validProviders.includes(res.data.active_provider)) {
-          setProvider(res.data.active_provider);
+        const validProviders = ['anthropic', 'groq', 'gemini', 'openai', 'ollama'];
+        const currentProv = (res.data?.active_provider && validProviders.includes(res.data.active_provider))
+          ? res.data.active_provider
+          : 'groq';
+        setProvider(currentProv);
+
+        if (res.data?.active_model) {
+          const provModels = res.data?.available_models?.[currentProv] || [];
+          const isPreset = provModels.some(m => m.id === res.data.active_model);
+          if (isPreset) {
+            setSelectedModel(res.data.active_model);
+            setIsCustomModel(false);
+          } else {
+            setCustomModel(res.data.active_model);
+            setIsCustomModel(true);
+          }
         } else {
-          setProvider('groq');
+          const provModels = res.data?.available_models?.[currentProv] || [];
+          if (provModels.length > 0) {
+            setSelectedModel(provModels[0].id);
+          }
         }
       })
       .catch((err) => console.warn('[SettingsModal] Failed to fetch LLM status:', err));
@@ -106,12 +125,25 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
   if (!isOpen) return null;
 
   // --- LLM Actions ---
+  const handleSelectProvider = (provId) => {
+    setProvider(provId);
+    setStatusMessage(null);
+    setIsCustomModel(false);
+    const models = keyStatus?.available_models?.[provId] || [];
+    if (models.length > 0) {
+      setSelectedModel(models[0].id);
+    }
+  };
+
   const handleSaveLLM = async (e) => {
     e.preventDefault();
-    if (provider !== 'ollama' && !apiKey.trim()) {
+    const isConfigured = keyStatus?.providers?.[provider]?.is_configured;
+    if (provider !== 'ollama' && !apiKey.trim() && !isConfigured) {
       setStatusMessage({ type: 'error', text: 'Please enter a valid API key for the selected provider.' });
       return;
     }
+
+    const chosenModel = isCustomModel ? customModel.trim() : selectedModel;
 
     setLoading(true);
     setStatusMessage(null);
@@ -119,10 +151,11 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
     try {
       const res = await api.post('/api/settings/keys', {
         provider,
-        api_key: apiKey.trim()
+        api_key: apiKey.trim(),
+        model: chosenModel || undefined
       });
 
-      setStatusMessage({ type: 'success', text: res.data?.message || 'API key securely saved and verified.' });
+      setStatusMessage({ type: 'success', text: res.data?.message || 'Provider & model configuration securely saved and verified.' });
       setApiKey('');
       
       const updatedStatus = await api.get('/api/settings/keys');
@@ -353,6 +386,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
   const providerLinks = {
     groq: { name: 'Groq Cloud', url: 'https://console.groq.com/keys', note: 'Free & Ultra-Fast (Recommended)' },
     gemini: { name: 'Google AI Studio', url: 'https://aistudio.google.com/app/apikey', note: 'Gemini Flash' },
+    anthropic: { name: 'Anthropic Console', url: 'https://console.anthropic.com/settings/keys', note: 'Claude 3.5 Sonnet / Haiku' },
     openai: { name: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys', note: 'GPT-4o / GPT-4o-mini' },
     ollama: { name: 'Ollama Local', url: 'https://ollama.ai', note: 'Local offline models' }
   };
@@ -394,7 +428,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
             }`}
           >
             <Cpu className="h-3.5 w-3.5" />
-            <span>AI Providers</span>
+            <span>AI Providers & Models</span>
           </button>
 
           <button
@@ -458,17 +492,18 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 <label className="block text-xs font-semibold text-slate-700 mb-2">
                   Select AI Reasoning Engine
                 </label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                   {[
-                    { id: 'groq', name: 'Groq Cloud', desc: 'Free & Ultra-Fast', badge: 'Recommended' },
-                    { id: 'gemini', name: 'Google Gemini', desc: 'Flash 1.5/2.0' },
-                    { id: 'openai', name: 'OpenAI Platform', desc: 'GPT-4o Mini' },
-                    { id: 'ollama', name: 'Local Ollama', desc: 'Offline / Free' },
+                    { id: 'groq', name: 'Groq Cloud', desc: 'Llama 3.3 / Free', badge: 'Fastest' },
+                    { id: 'gemini', name: 'Google Gemini', desc: 'Flash 1.5/2.5 / Lite', badge: 'Recommended' },
+                    { id: 'anthropic', name: 'Anthropic Claude', desc: 'Claude 3.5 Sonnet / Haiku', badge: 'High Accuracy' },
+                    { id: 'openai', name: 'OpenAI Platform', desc: 'GPT-4o Mini / o3-mini' },
+                    { id: 'ollama', name: 'Local Ollama', desc: 'Offline / Self-Hosted' },
                   ].map((item) => (
                     <button
                       type="button"
                       key={item.id}
-                      onClick={() => { setProvider(item.id); setStatusMessage(null); }}
+                      onClick={() => handleSelectProvider(item.id)}
                       className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         provider === item.id
                           ? 'border-indigo-600 bg-indigo-50/60 text-indigo-950 font-semibold shadow-xs ring-1 ring-indigo-500'
@@ -485,7 +520,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                       </div>
                       <span className="text-[11px] text-slate-500 block mt-0.5">{item.desc}</span>
                       {keyStatus?.providers?.[item.id]?.is_configured && (
-                        <span className="text-[10px] text-emerald-600 font-mono mt-1 block">
+                        <span className="text-[10px] text-emerald-600 font-mono mt-1 block truncate">
                           Active: {keyStatus.providers[item.id].masked}
                         </span>
                       )}
@@ -494,11 +529,75 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 </div>
               </div>
 
+              {/* Model Selection Section */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Cpu className="h-3.5 w-3.5 text-indigo-600" />
+                    <span>Select Model ({provider.toUpperCase()})</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomModel(!isCustomModel)}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+                  >
+                    {isCustomModel ? 'Choose from Presets' : 'Custom Model Override'}
+                  </button>
+                </div>
+
+                {!isCustomModel ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {(keyStatus?.available_models?.[provider] || []).map((m) => {
+                      const isSelected = selectedModel === m.id;
+                      return (
+                        <button
+                          type="button"
+                          key={m.id}
+                          onClick={() => setSelectedModel(m.id)}
+                          className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-indigo-600 bg-white text-indigo-950 font-semibold shadow-xs ring-1 ring-indigo-500'
+                              : 'border-slate-200 hover:border-slate-300 bg-white/70 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-xs truncate">{m.name}</span>
+                            {m.badge && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 uppercase">
+                                {m.badge}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-500 block mt-0.5 line-clamp-1">{m.desc}</span>
+                          <span className="text-[9px] text-slate-400 font-mono block mt-1 truncate">{m.id}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      value={customModel}
+                      onChange={(e) => setCustomModel(e.target.value)}
+                      placeholder={`Enter custom ${provider} model name (e.g. ${provider === 'anthropic' ? 'claude-3-7-sonnet-20250219' : provider === 'gemini' ? 'gemini-2.5-pro' : 'custom-model-id'})`}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-500">Specify any model ID accepted by the {provider} API.</p>
+                  </div>
+                )}
+              </div>
+
               {provider !== 'ollama' && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-semibold text-slate-700">
                       {(activeProviderInfo?.name || provider || 'Provider').toUpperCase()} API Key
+                      {keyStatus?.providers?.[provider]?.is_configured && (
+                        <span className="ml-2 text-[11px] text-emerald-600 font-normal">
+                          (Saved: {keyStatus.providers[provider].masked})
+                        </span>
+                      )}
                     </label>
                     <a
                       href={activeProviderInfo?.url || '#'}
@@ -516,7 +615,11 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                       type={showKey ? 'text' : 'password'}
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={`Enter your ${(activeProviderInfo?.name || provider)} key (e.g. ${provider === 'groq' ? 'gsk_...' : provider === 'openai' ? 'sk-...' : 'AIza...'})`}
+                      placeholder={
+                        keyStatus?.providers?.[provider]?.is_configured
+                          ? `Leave blank to keep current key (${keyStatus.providers[provider].masked})`
+                          : `Enter your ${(activeProviderInfo?.name || provider)} key (e.g. ${provider === 'anthropic' ? 'sk-ant-api03-...' : provider === 'groq' ? 'gsk_...' : provider === 'openai' ? 'sk-...' : 'AIza...'})`
+                      }
                       className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50"
                       autoComplete="off"
                     />
