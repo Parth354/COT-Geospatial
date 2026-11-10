@@ -20,44 +20,28 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Professional Basemap Catalog
+// 100% Free Public Basemap Catalog (Zero API Keys Required)
 const BASEMAP_PRESETS = {
-  carto_positron: {
-    id: 'carto_positron',
-    name: 'CartoDB Positron',
-    category: 'Light Clean',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxZoom: 20
+  osm_standard: {
+    id: 'osm_standard',
+    name: 'OpenStreetMap Standard',
+    category: 'Open Geographic (Free)',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
   },
   esri_satellite: {
     id: 'esri_satellite',
     name: 'ESRI World Imagery',
-    category: 'High-Res Satellite',
+    category: 'High-Res Satellite (Free)',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and GIS User Community',
-    maxZoom: 19
-  },
-  carto_dark: {
-    id: 'carto_dark',
-    name: 'CartoDB Dark Matter',
-    category: 'Dark Tactical',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxZoom: 20
-  },
-  osm_standard: {
-    id: 'osm_standard',
-    name: 'OpenStreetMap',
-    category: 'Standard Carto',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19
   },
   topo: {
     id: 'topo',
     name: 'OpenTopoMap',
-    category: 'Topographic Contours',
+    category: 'Topographic Contours (Free)',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, SRTM | <a href="https://opentopomap.org">OpenTopoMap</a>',
     maxZoom: 17
@@ -91,12 +75,12 @@ function MapViewer() {
   const [showFullscreenResults, setShowFullscreenResults] = useState(false);
 
   // Basemap & HUD state
-  const [activeBasemapKey, setActiveBasemapKey] = useState('carto_positron');
+  const [activeBasemapKey, setActiveBasemapKey] = useState('osm_standard');
   const [showBasemapMenu, setShowBasemapMenu] = useState(false);
   const [cursorPos, setCursorPos] = useState({ lat: 20.5937, lng: 78.9629 });
   const [currentZoom, setCurrentZoom] = useState(homeZoom);
 
-  const activeBasemap = BASEMAP_PRESETS[activeBasemapKey] || BASEMAP_PRESETS.carto_positron;
+  const activeBasemap = BASEMAP_PRESETS[activeBasemapKey] || BASEMAP_PRESETS.osm_standard;
 
   const handleCursorMove = useCallback((lat, lng) => {
     setCursorPos({ lat, lng });

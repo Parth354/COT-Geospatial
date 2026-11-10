@@ -89,11 +89,9 @@ Connect any RESTful data endpoint into the AI agent's execution loop without wri
 - **Dynamic Tool Registration**: Each enabled custom feed is dynamically registered as a dedicated agent tool (e.g., `fetch_custom_usgs_seismic_feed`), allowing the agent to fetch, validate, transform into GeoPandas GeoDataFrames, and render live layers seamlessly.
 
 ### 3. Upgraded Enterprise Leaflet Geospatial Viewer
-- **Multi-Basemap Switching**:
-  - *CartoDB Positron*: Ultra-clean light cartography for feature highlighting.
-  - *ESRI World Imagery*: Sub-meter high-resolution satellite imagery.
-  - *CartoDB Dark Matter*: Dark tactical backdrop for high-contrast night/thermal visualizations.
+- **Multi-Basemap Switching (100% Free & No Keys Required)**:
   - *OpenStreetMap Standard*: Canonical global open geographic reference.
+  - *ESRI World Imagery*: Sub-meter high-resolution satellite imagery (free public GIS tiles).
   - *OpenTopoMap*: Elevation contour lines and physical terrain visualization.
 - **Head-Up Display (HUD)**: Real-time cursor coordinates (`Lat: 28.6139°N | Lon: 77.2090°E`) with zoom scale and spatial reference system tag (`EPSG:4326`).
 - **Extent Fitting**: One-click "Fit All Layers" button automatically unions active bounding boxes and frames the viewport.
