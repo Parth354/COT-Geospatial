@@ -5,8 +5,9 @@ uvicorn[standard]
 # SQLAlchemy
 SQLAlchemy
 
-# PostgreSQL adapter
+# PostgreSQL adapters (supports both psycopg2 and modern psycopg v3 dialects)
 psycopg2-binary
+psycopg[binary]
 
 # GeoAlchemy & PostGIS support
 geoalchemy2
