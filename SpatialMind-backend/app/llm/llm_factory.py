@@ -10,10 +10,10 @@ _llm_instances = {}
 def get_llm(model_type: str = "auto", model: str = "") -> UniversalRestLLM:
     """
     Factory function returning a production-grade UniversalRestLLM.
-    Supports Anthropic (Claude), Google Gemini, Groq, OpenAI, and Local Ollama.
+    Supports Anthropic (Claude), Google Gemini, Groq, and OpenAI.
     NO MOCKING: Calls actual provider endpoints and reports real authentication status.
     """
-    provider = model_type if model_type in ["groq", "openai", "gemini", "anthropic", "ollama"] else settings.LLM_PROVIDER
+    provider = model_type if model_type in ["groq", "openai", "gemini", "anthropic"] else settings.LLM_PROVIDER
     active_model = model or getattr(settings, "LLM_MODEL", "")
     instance_key = f"{provider}:{active_model}"
 

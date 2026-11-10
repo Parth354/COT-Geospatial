@@ -37,7 +37,7 @@ flowchart TD
     end
 
     subgraph External ["External Intelligence & Telemetry"]
-        LLM["AI Providers: Anthropic Claude / Gemini / Groq / OpenAI / Ollama"]
+        LLM["AI Providers: Anthropic Claude / Gemini / Groq / OpenAI"]
         APIs["Standard Feeds: NASA FIRMS / OpenAQ / Mapbox / OpenWeather"]
         CustomFeeds["Custom Data APIs (GeoJSON / Coordinate Arrays / Rasters)"]
         MCPServers["Model Context Protocol (MCP) Remote Servers"]
@@ -73,11 +73,10 @@ flowchart TD
 
 ### 1. Multi-Provider AI Inference & Dynamic Model Selection
 SpatialMind supports plug-and-play LLM providers with full model customization:
-- **Anthropic Claude**: `claude-3-5-sonnet-20241022` (Recommended for spatial precision), `claude-3-5-haiku-20241022`, `claude-3-opus-20240229`.
-- **Google Gemini**: `gemini-3.5-flash-lite` (Default resilient engine), `gemini-2.5-flash`, `gemini-1.5-pro`.
-- **Groq Cloud**: `llama-3.3-70b-versatile` (Ultra-low latency open weights), `llama-3.1-8b-instant`, `mixtral-8x7b-32768`.
-- **OpenAI Platform**: `gpt-4o-mini`, `gpt-4o`, `o3-mini`.
-- **Local Ollama**: `mistral`, `llama3`, `qwen2.5` (Offline, zero network leakage).
+- **Anthropic Claude**: `claude-3-7-sonnet-latest` (Frontier hybrid reasoning), `claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`, `claude-3-opus-latest`.
+- **Google Gemini**: `gemini-2.0-flash` (Free tier multimodal), `gemini-1.5-flash` (Resilient, high rate limits), `gemini-1.5-pro`.
+- **Groq Cloud**: `llama-3.3-70b-versatile` (Ultra-low latency open weights), `deepseek-r1-distill-llama-70b`, `llama-3.1-8b-instant`.
+- **OpenAI Platform**: `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`.
 - **Custom Model ID Override**: Ability to enter custom fine-tuned model identifiers for any supported provider directly in the Settings modal.
 
 ### 2. Universal Custom Data API Integration
@@ -265,7 +264,7 @@ SpatialMind can be deployed to production 100% free with the following verified 
 | `REDIS_URL` | `redis://redis:6379/0` | Redis broker and cache URL |
 | `CELERY_BROKER_URL` | Inherits `REDIS_URL` | Celery task queue broker |
 | `CELERY_RESULT_BACKEND` | Inherits `REDIS_URL` | Celery asynchronous results backend |
-| `LLM_PROVIDER` | `gemini` | Active provider (`anthropic`, `gemini`, `groq`, `openai`, `ollama`) |
+| `LLM_PROVIDER` | `gemini` | Active provider (`anthropic`, `gemini`, `groq`, `openai`) |
 | `LLM_MODEL` | *(provider default)* | Active model ID override |
 | `ANTHROPIC_API_KEY` | *(optional)* | Anthropic Claude API key |
 | `GOOGLE_API_KEY` | *(optional)* | Google Gemini AI Studio API key |

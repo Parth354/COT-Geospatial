@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLM_PROVIDER: str = "auto"
     LLM_MODEL: str = ""
     HUGGINGFACE_HUB_TOKEN: str = ""

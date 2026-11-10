@@ -18,8 +18,8 @@ router = APIRouter(prefix="/settings", tags=["Settings"])
 ENV_PATH = BACKEND_ROOT / ".env"
 
 class KeyUpdateRequest(BaseModel):
-    provider: str = Field(..., description="Provider name: 'anthropic', 'gemini', 'groq', 'openai', or 'ollama'")
-    api_key: str = Field(default="", description="The API key string (optional for ollama)")
+    provider: str = Field(..., description="Provider name: 'anthropic', 'gemini', 'groq', or 'openai'")
+    api_key: str = Field(default="", description="The API key string")
     model: Optional[str] = Field(default=None, description="Optional model identifier override")
 
 class KeyStatusResponse(BaseModel):
@@ -54,12 +54,6 @@ AVAILABLE_MODELS = {
         {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "badge": "Recommended", "desc": "Fast & cost effective"},
         {"id": "o3-mini", "name": "o3-mini", "badge": "Reasoning", "desc": "Advanced multi-step reasoning"},
         {"id": "o1", "name": "o1", "badge": "Deep Think", "desc": "Deep analytical thinking"}
-    ],
-    "ollama": [
-        {"id": "llama3.3", "name": "Llama 3.3", "badge": "Local", "desc": "Meta open weights on local machine"},
-        {"id": "deepseek-r1", "name": "DeepSeek R1", "badge": "Local", "desc": "Local reasoning model"},
-        {"id": "qwen2.5", "name": "Qwen 2.5", "badge": "Local", "desc": "Multilingual spatial coding model"},
-        {"id": "mistral", "name": "Mistral 7B", "badge": "Local", "desc": "Balanced local offline model"}
     ]
 }
 
@@ -108,9 +102,6 @@ def _update_env_file(key_name: str, new_value: str, provider: str, model: Option
 
 def _test_key(provider: str, api_key: str, model: Optional[str] = None) -> bool:
     """Verifies that the provided API key is accepted by the remote provider."""
-    if provider == "ollama":
-        return True
-
     if not api_key:
         return False
 
@@ -215,9 +206,6 @@ def get_key_status():
     elif active_provider == "gemini" or (active_provider == "auto" and gemini_k):
         active_provider = "gemini"
         current_key = gemini_k
-    elif active_provider == "ollama":
-        active_provider = "ollama"
-        current_key = "local"
     else:
         active_provider = "groq"
         current_key = groq_k
@@ -232,8 +220,7 @@ def get_key_status():
             "anthropic": {"is_configured": bool(anthropic_k), "masked": _mask_key(anthropic_k)},
             "groq": {"is_configured": bool(groq_k), "masked": _mask_key(groq_k)},
             "gemini": {"is_configured": bool(gemini_k), "masked": _mask_key(gemini_k)},
-            "openai": {"is_configured": bool(openai_k), "masked": _mask_key(openai_k)},
-            "ollama": {"is_configured": True, "masked": "Local Host"}
+            "openai": {"is_configured": bool(openai_k), "masked": _mask_key(openai_k)}
         }
     }
 
@@ -244,7 +231,7 @@ def update_api_key(req: KeyUpdateRequest):
     Tests key authenticity, updates settings and .env, and refreshes the LLM instance cache.
     """
     provider = req.provider.lower().strip()
-    if provider not in ["anthropic", "groq", "gemini", "openai", "ollama"]:
+    if provider not in ["anthropic", "groq", "gemini", "openai"]:
         raise HTTPException(status_code=400, detail=f"Unsupported provider: '{provider}'")
 
     api_key = req.api_key.strip()
@@ -260,7 +247,7 @@ def update_api_key(req: KeyUpdateRequest):
     env_var_name = env_map.get(provider, "")
 
     # If key is empty, check if already configured in settings or environment
-    if not api_key and provider != "ollama":
+    if not api_key:
         existing_key = getattr(settings, env_var_name, "") or os.environ.get(env_var_name, "")
         if existing_key:
             api_key = existing_key

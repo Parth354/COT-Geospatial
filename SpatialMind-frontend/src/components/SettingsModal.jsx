@@ -68,7 +68,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
     api.get('/api/settings/keys')
       .then((res) => {
         setKeyStatus(res.data);
-        const validProviders = ['anthropic', 'groq', 'gemini', 'openai', 'ollama'];
+        const validProviders = ['anthropic', 'groq', 'gemini', 'openai'];
         const currentProv = (res.data?.active_provider && validProviders.includes(res.data.active_provider))
           ? res.data.active_provider
           : 'groq';
@@ -138,7 +138,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
   const handleSaveLLM = async (e) => {
     e.preventDefault();
     const isConfigured = keyStatus?.providers?.[provider]?.is_configured;
-    if (provider !== 'ollama' && !apiKey.trim() && !isConfigured) {
+    if (!apiKey.trim() && !isConfigured) {
       setStatusMessage({ type: 'error', text: 'Please enter a valid API key for the selected provider.' });
       return;
     }
@@ -387,8 +387,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
     groq: { name: 'Groq Cloud', url: 'https://console.groq.com/keys', note: 'Free & Ultra-Fast (Recommended)' },
     gemini: { name: 'Google AI Studio', url: 'https://aistudio.google.com/app/apikey', note: 'Gemini 2.0 / 1.5 Flash (Free Tier)' },
     anthropic: { name: 'Anthropic Console', url: 'https://console.anthropic.com/settings/keys', note: 'Claude 3.7 / 3.5 Sonnet & Haiku' },
-    openai: { name: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys', note: 'GPT-4o / GPT-4o-mini / o3-mini' },
-    ollama: { name: 'Ollama Local', url: 'https://ollama.ai', note: 'Local offline models' }
+    openai: { name: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys', note: 'GPT-4o / GPT-4o-mini / o3-mini' }
   };
 
   const activeProviderInfo = providerLinks[provider] || providerLinks.groq;
@@ -492,13 +491,12 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 <label className="block text-xs font-semibold text-slate-700 mb-2">
                   Select AI Reasoning Engine
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {[
                     { id: 'groq', name: 'Groq Cloud', desc: 'Llama 3.3 / DeepSeek R1', badge: 'Ultra-Fast' },
                     { id: 'gemini', name: 'Google Gemini', desc: '2.0 Flash / 1.5 Flash', badge: 'Free Tier' },
                     { id: 'anthropic', name: 'Anthropic Claude', desc: 'Claude 3.7 / 3.5 Sonnet', badge: 'Recommended' },
                     { id: 'openai', name: 'OpenAI Platform', desc: 'GPT-4o / o3-mini', badge: 'Frontier' },
-                    { id: 'ollama', name: 'Local Ollama', desc: 'Llama 3.3 / Offline', badge: 'Self-Hosted' },
                   ].map((item) => (
                     <button
                       type="button"
@@ -546,7 +544,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 </div>
 
                 {!isCustomModel ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                     {(keyStatus?.available_models?.[provider] || []).map((m) => {
                       const isSelected = selectedModel === m.id;
                       return (
@@ -580,7 +578,7 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                       type="text"
                       value={customModel}
                       onChange={(e) => setCustomModel(e.target.value)}
-                      placeholder={`Enter custom ${provider} model name (e.g. ${provider === 'anthropic' ? 'claude-3-7-sonnet-20250219' : provider === 'gemini' ? 'gemini-2.5-pro' : 'custom-model-id'})`}
+                      placeholder={`Enter custom ${provider} model name (e.g. ${provider === 'anthropic' ? 'claude-3-7-sonnet-latest' : provider === 'gemini' ? 'gemini-2.0-flash' : 'custom-model-id'})`}
                       className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                     />
                     <p className="text-[10px] text-slate-500">Specify any model ID accepted by the {provider} API.</p>
@@ -588,51 +586,49 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 )}
               </div>
 
-              {provider !== 'ollama' && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-slate-700">
-                      {(activeProviderInfo?.name || provider || 'Provider').toUpperCase()} API Key
-                      {keyStatus?.providers?.[provider]?.is_configured && (
-                        <span className="ml-2 text-[11px] text-emerald-600 font-normal">
-                          (Saved: {keyStatus.providers[provider].masked})
-                        </span>
-                      )}
-                    </label>
-                    <a
-                      href={activeProviderInfo?.url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium"
-                    >
-                      <span>Get API key</span>
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
-                  </div>
-
-                  <div className="relative">
-                    <input
-                      type={showKey ? 'text' : 'password'}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={
-                        keyStatus?.providers?.[provider]?.is_configured
-                          ? `Leave blank to keep current key (${keyStatus.providers[provider].masked})`
-                          : `Enter your ${(activeProviderInfo?.name || provider)} key (e.g. ${provider === 'anthropic' ? 'sk-ant-api03-...' : provider === 'groq' ? 'gsk_...' : provider === 'openai' ? 'sk-...' : 'AIza...'})`
-                      }
-                      className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50"
-                      autoComplete="off"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKey(!showKey)}
-                      className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                  </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    {(activeProviderInfo?.name || provider || 'Provider').toUpperCase()} API Key
+                    {keyStatus?.providers?.[provider]?.is_configured && (
+                      <span className="ml-2 text-[11px] text-emerald-600 font-normal">
+                        (Saved: {keyStatus.providers[provider].masked})
+                      </span>
+                    )}
+                  </label>
+                  <a
+                    href={activeProviderInfo?.url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium"
+                  >
+                    <span>Get API key</span>
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
                 </div>
-              )}
+
+                <div className="relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder={
+                      keyStatus?.providers?.[provider]?.is_configured
+                        ? `Leave blank to keep current key (${keyStatus.providers[provider].masked})`
+                        : `Enter your ${(activeProviderInfo?.name || provider)} key (e.g. ${provider === 'anthropic' ? 'sk-ant-api03-...' : provider === 'groq' ? 'gsk_...' : provider === 'openai' ? 'sk-...' : 'AIza...'})`
+                    }
+                    className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
 
               {statusMessage && (
                 <div className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
