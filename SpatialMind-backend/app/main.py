@@ -39,17 +39,10 @@ app = FastAPI(
 )
 
 # --- Middleware Configuration ---
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://localhost:80",
-    "http://localhost",
-]
-
+# Allow local dev and production frontend origins (Vercel, Netlify, custom domains)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,9 +66,15 @@ app.include_router(settings_router, prefix=API_PREFIX, tags=["Settings"])
 
 app.include_router(websocket_router, tags=["WebSockets"])
 
-# --- Health check endpoint ---
+# --- Health check & Root probes (Render / Cloud deployment) ---
+@app.get("/")
+@app.head("/")
+def root():
+    return {"status": "operational", "service": "SpatialMind Geospatial AI Platform"}
+
 @app.get("/health")
 @app.get("/api/health")
+@app.head("/health")
 def health_check():
     return {"status": "healthy", "service": "SpatialMind API"}
 

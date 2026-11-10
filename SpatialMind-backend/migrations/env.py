@@ -2,7 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from app.models.database import Base  # Import Base to ensure models are registered
+from app.models.database import Base, normalize_database_url  # Import Base & URL normalizer
 from app.core.config import settings  # Import settings for database URL
 from app.models.dataset import Dataset  # Import models to ensure they are registered
 from app.models.layer import Layer  # Import models to ensure they are registered
@@ -18,11 +18,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Ensure alembic uses settings.DATABASE_URL
-db_url = str(settings.DATABASE_URL).strip()
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-config.set_main_option("sqlalchemy.url", db_url)
+# Ensure alembic uses normalized settings.DATABASE_URL
+config.set_main_option("sqlalchemy.url", normalize_database_url(str(settings.DATABASE_URL)))
 
 # add your model's MetaData object here
 # for 'autogenerate' support
