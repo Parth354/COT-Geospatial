@@ -47,18 +47,18 @@ class UniversalRestLLM:
             gemini_key = ""
 
         if provider == "anthropic" or (provider == "auto" and anthropic_key):
-            return "anthropic", anthropic_key, configured_model or "claude-3-5-sonnet-20241022"
+            return "anthropic", anthropic_key, configured_model or "claude-3-7-sonnet-latest"
         elif provider == "groq" or (provider == "auto" and groq_key):
             return "groq", groq_key, configured_model or "llama-3.3-70b-versatile"
         elif provider == "openai" or (provider == "auto" and openai_key):
             return "openai", openai_key, configured_model or "gpt-4o-mini"
         elif provider == "gemini" or (provider == "auto" and gemini_key):
-            return "gemini", gemini_key, configured_model or "gemini-3.5-flash-lite"
+            return "gemini", gemini_key, configured_model or "gemini-2.0-flash"
         elif provider == "ollama":
-            return "ollama", "", configured_model or "mistral"
+            return "ollama", "", configured_model or "llama3.3"
         
         # If auto and nothing configured, return best candidate with empty key for diagnostic reporting
-        return "gemini", gemini_key, configured_model or "gemini-3.5-flash-lite"
+        return "gemini", gemini_key, configured_model or "gemini-2.0-flash"
 
     def invoke(self, prompt: Any) -> LLMResponse:
         prompt_text = prompt.to_string() if hasattr(prompt, "to_string") else str(prompt)

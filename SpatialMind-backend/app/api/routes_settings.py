@@ -32,29 +32,34 @@ BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 AVAILABLE_MODELS = {
     "anthropic": [
-        {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet", "badge": "Recommended", "desc": "High accuracy spatial reasoning & planning"},
-        {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku", "badge": "Ultra Fast", "desc": "Lightweight & fast inference"},
-        {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus", "badge": "Deep Reasoning", "desc": "Complex multi-variable analysis"}
+        {"id": "claude-3-7-sonnet-latest", "name": "Claude 3.7 Sonnet", "badge": "New / Flagship", "desc": "Frontier hybrid reasoning, deep logic & coding"},
+        {"id": "claude-3-5-sonnet-latest", "name": "Claude 3.5 Sonnet", "badge": "Recommended", "desc": "High accuracy spatial reasoning & planning"},
+        {"id": "claude-3-5-haiku-latest", "name": "Claude 3.5 Haiku", "badge": "Ultra Fast", "desc": "Sub-second, lightweight & cost-efficient"},
+        {"id": "claude-3-opus-latest", "name": "Claude 3 Opus", "badge": "Deep Reasoning", "desc": "Complex multi-variable analysis"}
     ],
     "gemini": [
-        {"id": "gemini-3.5-flash-lite", "name": "Gemini Flash Lite", "badge": "Recommended", "desc": "Ultra resilient, zero throttling"},
-        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "badge": "Latest", "desc": "Fast multimodal reasoning"},
-        {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "badge": "Pro", "desc": "Long context & complex synthesis"}
+        {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "badge": "Recommended", "desc": "Free tier high speed multimodal intelligence"},
+        {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "badge": "Free / Resilient", "desc": "Generous free tier rate limits, zero throttling"},
+        {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "badge": "Long Context", "desc": "2M token context & complex synthesis"},
+        {"id": "gemini-2.5-flash-lite", "name": "Gemini 2.5 Flash Lite", "badge": "Lightweight", "desc": "Low latency spatial reasoning"}
     ],
     "groq": [
-        {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "badge": "Recommended", "desc": "Free, open-weights, high speed"},
+        {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "badge": "Recommended", "desc": "Free, open-weights, ultra-high throughput"},
+        {"id": "deepseek-r1-distill-llama-70b", "name": "DeepSeek R1 70B", "badge": "Reasoning", "desc": "Deep reasoning open weights on Groq LPU"},
         {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B", "badge": "Instant", "desc": "Sub-second token latency"},
         {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "badge": "MoE", "desc": "32k context MoE architecture"}
     ],
     "openai": [
-        {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "badge": "Recommended", "desc": "Fast & cost effective"},
         {"id": "gpt-4o", "name": "GPT-4o", "badge": "Flagship", "desc": "Omnimodal frontier intelligence"},
-        {"id": "o3-mini", "name": "o3-mini", "badge": "Reasoning", "desc": "Advanced multi-step reasoning"}
+        {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "badge": "Recommended", "desc": "Fast & cost effective"},
+        {"id": "o3-mini", "name": "o3-mini", "badge": "Reasoning", "desc": "Advanced multi-step reasoning"},
+        {"id": "o1", "name": "o1", "badge": "Deep Think", "desc": "Deep analytical thinking"}
     ],
     "ollama": [
-        {"id": "mistral", "name": "Mistral 7B", "badge": "Local", "desc": "Balanced local offline model"},
-        {"id": "llama3", "name": "Llama 3", "badge": "Local", "desc": "Meta open weights on local GPU"},
-        {"id": "qwen2.5", "name": "Qwen 2.5", "badge": "Local", "desc": "Multilingual spatial coding model"}
+        {"id": "llama3.3", "name": "Llama 3.3", "badge": "Local", "desc": "Meta open weights on local machine"},
+        {"id": "deepseek-r1", "name": "DeepSeek R1", "badge": "Local", "desc": "Local reasoning model"},
+        {"id": "qwen2.5", "name": "Qwen 2.5", "badge": "Local", "desc": "Multilingual spatial coding model"},
+        {"id": "mistral", "name": "Mistral 7B", "badge": "Local", "desc": "Balanced local offline model"}
     ]
 }
 

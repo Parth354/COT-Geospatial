@@ -385,9 +385,9 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
 
   const providerLinks = {
     groq: { name: 'Groq Cloud', url: 'https://console.groq.com/keys', note: 'Free & Ultra-Fast (Recommended)' },
-    gemini: { name: 'Google AI Studio', url: 'https://aistudio.google.com/app/apikey', note: 'Gemini Flash' },
-    anthropic: { name: 'Anthropic Console', url: 'https://console.anthropic.com/settings/keys', note: 'Claude 3.5 Sonnet / Haiku' },
-    openai: { name: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys', note: 'GPT-4o / GPT-4o-mini' },
+    gemini: { name: 'Google AI Studio', url: 'https://aistudio.google.com/app/apikey', note: 'Gemini 2.0 / 1.5 Flash (Free Tier)' },
+    anthropic: { name: 'Anthropic Console', url: 'https://console.anthropic.com/settings/keys', note: 'Claude 3.7 / 3.5 Sonnet & Haiku' },
+    openai: { name: 'OpenAI Platform', url: 'https://platform.openai.com/api-keys', note: 'GPT-4o / GPT-4o-mini / o3-mini' },
     ollama: { name: 'Ollama Local', url: 'https://ollama.ai', note: 'Local offline models' }
   };
 
@@ -494,11 +494,11 @@ export const SettingsModal = ({ isOpen, onClose, onKeySaved }) => {
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                   {[
-                    { id: 'groq', name: 'Groq Cloud', desc: 'Llama 3.3 / Free', badge: 'Fastest' },
-                    { id: 'gemini', name: 'Google Gemini', desc: 'Flash 1.5/2.5 / Lite', badge: 'Recommended' },
-                    { id: 'anthropic', name: 'Anthropic Claude', desc: 'Claude 3.5 Sonnet / Haiku', badge: 'High Accuracy' },
-                    { id: 'openai', name: 'OpenAI Platform', desc: 'GPT-4o Mini / o3-mini' },
-                    { id: 'ollama', name: 'Local Ollama', desc: 'Offline / Self-Hosted' },
+                    { id: 'groq', name: 'Groq Cloud', desc: 'Llama 3.3 / DeepSeek R1', badge: 'Ultra-Fast' },
+                    { id: 'gemini', name: 'Google Gemini', desc: '2.0 Flash / 1.5 Flash', badge: 'Free Tier' },
+                    { id: 'anthropic', name: 'Anthropic Claude', desc: 'Claude 3.7 / 3.5 Sonnet', badge: 'Recommended' },
+                    { id: 'openai', name: 'OpenAI Platform', desc: 'GPT-4o / o3-mini', badge: 'Frontier' },
+                    { id: 'ollama', name: 'Local Ollama', desc: 'Llama 3.3 / Offline', badge: 'Self-Hosted' },
                   ].map((item) => (
                     <button
                       type="button"
