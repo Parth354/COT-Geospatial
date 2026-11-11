@@ -420,28 +420,7 @@ class LLMChainOfThoughtAgent:
         """
         q = query.lower()
 
-        if any(k in q for k in ["pollution", "aqi", "air", "pm25", "pm10", "delhi", "forecast", "smog", "emission"]):
-            return {
-                "domain": "Air Quality & Atmospheric Modeling",
-                "coverage_completeness_pct": 68.0,
-                "uncertainty_rating": "Moderate (Confidence ±15% on outer perimeter)",
-                "spatial_resolution": "10-12 discrete ground monitoring stations interpolated to 12x12 grid (144 cells)",
-                "temporal_cadence": "Hourly atmospheric forecast (1-5 days horizon)",
-                "identified_incomplete_aspects": [
-                    "Sparse Spatial Density: 10-12 monitoring stations across 1,484 km² leaves outer peri-urban boundaries (outer Najafgarh, Alipur, Bawana fringe) to spatial IDW approximation.",
-                    "Missing Secondary Pollutants: Lack of Volatile Organic Compounds (VOCs), Ammonia (NH3), and speciated Black Carbon aerosol concentrations.",
-                    "Vertical Profile Gap: Absence of real-time Planetary Boundary Layer (PBL) height and thermal inversion layer measurements governing ground-level trapping.",
-                    "Mobile Emission Telemetry: Fixed stations do not capture real-time vehicular traffic flow surges and arterial road congestion."
-                ],
-                "missing_variables": ["PBL Inversion Height", "Speciated VOCs", "NH3 Precursors", "Real-time Traffic Volume", "Micro-drainage Wind Vectors"],
-                "data_improvement_roadmap": [
-                    "Ingest Sentinel-5P TROPOMI Level-2 satellite rasters (NO2, CO, Aerosol Index) to eliminate spatial interpolation blindspots.",
-                    "Connect to official Central Pollution Control Board (CPCB) continuous CAAQMS 15-minute streaming API.",
-                    "Deploy and ingest low-cost community IoT micro-sensor networks (e.g. PurpleAir) in underserved residential sectors.",
-                    "Implement Land Use Regression (LUR) or Machine Learning spatial downscaling using road density, land cover, and topography."
-                ]
-            }
-        elif any(k in q for k in ["flood", "elevation", "dem", "inundat", "submerg", "water", "drainage"]):
+        if any(k in q for k in ["flood", "elevation", "dem", "inundat", "submerg", "water", "drainage", "river", "basin"]):
             return {
                 "domain": "Flood Hazard & Hydrological Exposure",
                 "coverage_completeness_pct": 62.0,
@@ -460,6 +439,27 @@ class LLMChainOfThoughtAgent:
                     "Integrate municipal SWMM stormwater network GIS layers and pump station telemetry.",
                     "Couple dynamic rainfall-runoff hydrographs with live CWC Yamuna river level telemetry.",
                     "Incorporate impervious surface fraction rasters derived from Sentinel-2 MSI NDVI imagery."
+                ]
+            }
+        elif any(k in q for k in ["pollution", "aqi", "air", "pm25", "pm10", "smog", "emission", "cpcb"]):
+            return {
+                "domain": "Air Quality & Atmospheric Modeling",
+                "coverage_completeness_pct": 68.0,
+                "uncertainty_rating": "Moderate (Confidence ±15% on outer perimeter)",
+                "spatial_resolution": "10-12 discrete ground monitoring stations interpolated to 12x12 grid (144 cells)",
+                "temporal_cadence": "Hourly atmospheric forecast (1-5 days horizon)",
+                "identified_incomplete_aspects": [
+                    "Sparse Spatial Density: 10-12 monitoring stations across 1,484 km² leaves outer peri-urban boundaries (outer Najafgarh, Alipur, Bawana fringe) to spatial IDW approximation.",
+                    "Missing Secondary Pollutants: Lack of Volatile Organic Compounds (VOCs), Ammonia (NH3), and speciated Black Carbon aerosol concentrations.",
+                    "Vertical Profile Gap: Absence of real-time Planetary Boundary Layer (PBL) height and thermal inversion layer measurements governing ground-level trapping.",
+                    "Mobile Emission Telemetry: Fixed stations do not capture real-time vehicular traffic flow surges and arterial road congestion."
+                ],
+                "missing_variables": ["PBL Inversion Height", "Speciated VOCs", "NH3 Precursors", "Real-time Traffic Volume", "Micro-drainage Wind Vectors"],
+                "data_improvement_roadmap": [
+                    "Ingest Sentinel-5P TROPOMI Level-2 satellite rasters (NO2, CO, Aerosol Index) to eliminate spatial interpolation blindspots.",
+                    "Connect to official Central Pollution Control Board (CPCB) continuous CAAQMS 15-minute streaming API.",
+                    "Deploy and ingest low-cost community IoT micro-sensor networks (e.g. PurpleAir) in underserved residential sectors.",
+                    "Implement Land Use Regression (LUR) or Machine Learning spatial downscaling using road density, land cover, and topography."
                 ]
             }
         elif any(k in q for k in ["fire", "wildfire", "hotspot", "burn", "frp"]):

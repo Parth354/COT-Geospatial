@@ -271,16 +271,22 @@ def summarize_layer_attribute(input_layer: gpd.GeoDataFrame, attribute_column: s
     logger.info(f"Summarizing column '{attribute_column}' with function '{summary_function}'.")
     if attribute_column not in input_layer.columns:
         raise ValueError(f"Attribute column '{attribute_column}' not found in layer.")
-    if input_layer[attribute_column].dtype not in ['int64', 'float64']:
-        raise TypeError(f"Column '{attribute_column}' is not numeric and cannot be summarized.")
+        
+    series = input_layer[attribute_column]
+    if not pd.api.types.is_numeric_dtype(series):
+        try:
+            series = pd.to_numeric(series, errors='raise')
+            input_layer[attribute_column] = series
+        except Exception:
+            raise TypeError(f"Column '{attribute_column}' is not numeric and cannot be summarized.")
         
     func_map = {
-        "sum": input_layer[attribute_column].sum,
-        "mean": input_layer[attribute_column].mean,
-        "median": input_layer[attribute_column].median,
-        "max": input_layer[attribute_column].max,
-        "min": input_layer[attribute_column].min,
-        "count": input_layer[attribute_column].count,
+        "sum": series.sum,
+        "mean": series.mean,
+        "median": series.median,
+        "max": series.max,
+        "min": series.min,
+        "count": series.count,
     }
     
     if summary_function not in func_map:
@@ -456,6 +462,22 @@ def export_summary_stats(input_layer: gpd.GeoDataFrame) -> str:
     numeric_cols = input_layer.select_dtypes(include=['number']).columns.tolist()
     if not numeric_cols:
         return "No numeric attribute columns found in this layer."
+
+    # If mixed geometries exist (e.g. Polygons + Points), break down by geometry type
+    # so point facilities (with area=0) do not artificially dilute polygon zone metrics.
+    if "geometry" in input_layer.columns and input_layer.geometry.geom_type.nunique() > 1:
+        tables = []
+        for g_type, sub_gdf in input_layer.groupby(input_layer.geometry.geom_type):
+            sub_num = sub_gdf.select_dtypes(include=['number'])
+            if not sub_num.empty:
+                s_df = sub_num.describe().round(2)
+                try:
+                    t_str = s_df.to_markdown()
+                except Exception:
+                    t_str = f"```\n{s_df.to_string()}\n```"
+                tables.append(f"### Geometry: {g_type} ({len(sub_gdf)} features)\n\n{t_str}")
+        return "**Attribute Statistical Overview (Grouped by Geometry):**\n\n" + "\n\n".join(tables)
+
     stats_df = input_layer[numeric_cols].describe().round(2)
     try:
         table_str = stats_df.to_markdown()
