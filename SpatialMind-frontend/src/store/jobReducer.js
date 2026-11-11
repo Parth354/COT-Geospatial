@@ -1,4 +1,5 @@
 import { updateActiveJobMessage } from '../utils/updateActiveJobMessage.js';
+import { getDefaultLayerStyle } from '../utils/hazardStyling.js';
 
 export function jobReducer(state, action) {
   switch (action.type) {
@@ -52,17 +53,22 @@ export function jobReducer(state, action) {
           full_history: action.payload.full_history || []
         },
         // Flag to auto-add layers to map
-        _pendingLayersToAdd: layers.map(layer => ({
-          layerId: `${state.activeJobId}-${layer.layer_name}`,
-          name: layer.layer_name,
-          type: 'analysis_result',
-          visible: true,
-          dataUrl: layer.url,
-          featureCount: layer.feature_count,
-          bbox: layer.bbox,
-          style: layer.style || { color: '#ff5722', fillOpacity: 0.6, weight: 2 },
-          datasetId: state.activeJobId,
-        }))
+        _pendingLayersToAdd: layers.map(layer => {
+          const layerStyle = (layer.style && layer.style.color !== '#ff5722')
+            ? layer.style
+            : getDefaultLayerStyle(layer.layer_name);
+          return {
+            layerId: `${state.activeJobId}-${layer.layer_name}`,
+            name: layer.layer_name,
+            type: 'analysis_result',
+            visible: true,
+            dataUrl: layer.url,
+            featureCount: layer.feature_count,
+            bbox: layer.bbox,
+            style: layerStyle,
+            datasetId: state.activeJobId,
+          };
+        })
       };
       return updatedState;
     }

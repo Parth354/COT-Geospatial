@@ -224,6 +224,45 @@ class ToolExecutor:
             logger.error(f"Tool execution failed for '{tool_name}': {e}", exc_info=True)
             return f"Error: Tool '{tool_name}' failed. Details: {e}"
 
+    @staticmethod
+    def _determine_layer_style(name: str, gdf: gpd.GeoDataFrame) -> Dict[str, Any]:
+        """Determines default styling metadata aligned with hazard domain legend scales."""
+        n = name.lower()
+        if any(k in n for k in ["flood", "inundat", "submerg", "water", "river", "drain", "basin"]):
+            return {
+                "color": "#1e3a8a",
+                "fillColor": "#2563eb",
+                "fillOpacity": 0.65,
+                "weight": 2
+            }
+        elif any(k in n for k in ["fire", "hotspot", "thermal", "frp", "wildfire"]):
+            return {
+                "color": "#7f1d1d",
+                "fillColor": "#ef4444",
+                "fillOpacity": 0.65,
+                "weight": 2
+            }
+        elif any(k in n for k in ["aqi", "air", "pollut", "pm25", "pm10", "ozone", "smog"]):
+            return {
+                "color": "#c2410c",
+                "fillColor": "#ff7e00",
+                "fillOpacity": 0.65,
+                "weight": 2
+            }
+        elif any(k in n for k in ["snow", "avalanche", "slope", "elevation"]):
+            return {
+                "color": "#0369a1",
+                "fillColor": "#38bdf8",
+                "fillOpacity": 0.65,
+                "weight": 2
+            }
+        return {
+            "color": "#1d4ed8",
+            "fillColor": "#2563eb",
+            "fillOpacity": 0.65,
+            "weight": 2
+        }
+
     def get_generated_results(self) -> List[Dict[str, Any]]:
         """Saves only NEWLY GENERATED layers to GeoJSON and returns their metadata."""
         final_outputs = []
@@ -249,7 +288,8 @@ class ToolExecutor:
                     "url": f"/static/results/{self.job_id}/{name}.geojson",
                     "feature_count": len(gdf_wgs84),
                     "crs": "EPSG:4326",
-                    "bbox": {"west": bounds[0], "south": bounds[1], "east": bounds[2], "north": bounds[3]} if not gdf_wgs84.empty else None
+                    "bbox": {"west": bounds[0], "south": bounds[1], "east": bounds[2], "north": bounds[3]} if not gdf_wgs84.empty else None,
+                    "style": self._determine_layer_style(name, gdf_wgs84)
                 })
                 logger.info(f"Successfully saved generated layer '{name}'.")
             except Exception as e:

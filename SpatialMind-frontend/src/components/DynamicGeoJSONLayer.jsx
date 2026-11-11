@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { debounce } from 'lodash';
 import { layerAPI } from '../api/layerAPI.js';
 import { AlertTriangle } from 'lucide-react';
+import { isFloodDomain, getFloodFeatureColor, getDefaultLayerStyle, HAZARD_COLORS } from '../utils/hazardStyling.js';
 
 const LayerErrorIndicator = ({ message }) => (
   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-100 text-red-700 p-2 text-xs rounded shadow-lg flex items-center gap-2">
@@ -67,30 +68,80 @@ const DynamicGeoJSONLayer = React.memo(({ layer }) => {
   // Dynamic feature-level styling based on attribute properties (color, fillColor, opacity)
   const getFeatureStyle = (feature) => {
     const props = feature?.properties || {};
-    const featColor = props.color || props.fillColor || layer?.style?.color || '#2563eb';
-    const featOpacity = props.opacity ?? props.fillOpacity ?? layer?.style?.fillOpacity ?? 0.65;
     const isPolygon = feature?.geometry?.type?.includes('Polygon');
+    const isFlood = isFloodDomain(layer?.name, props);
+
+    let featColor;
+    let strokeColor;
+
+    if (isFlood) {
+      // Map directly to blue flood scale matching MapLegend.jsx
+      featColor = getFloodFeatureColor(props);
+      strokeColor = HAZARD_COLORS.flood.stroke;
+    } else if (props.color && props.color !== '#ff5722' && props.color !== '#ef4444') {
+      featColor = props.color;
+      strokeColor = props.color;
+    } else if (props.fillColor && props.fillColor !== '#ff5722' && props.fillColor !== '#ef4444') {
+      featColor = props.fillColor;
+      strokeColor = props.fillColor;
+    } else if (layer?.style?.fillColor || layer?.style?.color) {
+      const candidate = layer?.style?.fillColor || layer?.style?.color;
+      featColor = candidate;
+      strokeColor = layer?.style?.color || candidate;
+    } else {
+      const defaultStyle = getDefaultLayerStyle(layer?.name);
+      featColor = defaultStyle.fillColor;
+      strokeColor = defaultStyle.color;
+    }
+
+    const featOpacity = props.opacity ?? props.fillOpacity ?? layer?.style?.fillOpacity ?? 0.65;
 
     return {
-      color: featColor,
+      color: strokeColor,
       fillColor: featColor,
       fillOpacity: featOpacity,
       weight: isPolygon ? 1.5 : 2,
-      opacity: 0.9,
+      opacity: 0.95,
     };
   };
 
   // Render point features as dynamic circle markers with color classification
   const pointToLayer = (feature, latlng) => {
     const props = feature?.properties || {};
-    const color = props.color || props.fillColor || '#ef4444';
+    const isFlood = isFloodDomain(layer?.name, props);
+
+    let color;
     let radius = 7;
-    if (props.aqi || props.interpolated_aqi || props.forecast_aqi) {
+
+    if (isFlood) {
+      color = getFloodFeatureColor(props);
+      if (props.evacuation_center) {
+        radius = 9;
+      } else if (props.monitoring_station) {
+        radius = 8;
+      }
+    } else if (props.aqi || props.interpolated_aqi || props.forecast_aqi) {
       const val = props.forecast_aqi || props.interpolated_aqi || props.aqi;
       radius = Math.min(Math.max(val / 30, 6), 14);
+      if (val > 300) color = '#7e0023';
+      else if (val > 200) color = '#8f3f97';
+      else if (val > 150) color = '#ff0000';
+      else if (val > 100) color = '#ff7e00';
+      else if (val > 50) color = '#ffff00';
+      else color = '#00e400';
     } else if (props.total_frp_mw || props.frp) {
       const frp = props.total_frp_mw || props.frp;
       radius = Math.min(Math.max(frp / 25, 6), 16);
+      if (frp > 300) color = '#7f1d1d';
+      else if (frp > 150) color = '#ef4444';
+      else if (frp > 50) color = '#f97316';
+      else color = '#eab308';
+    } else if (props.color && props.color !== '#ef4444' && props.color !== '#ff5722') {
+      color = props.color;
+    } else if (layer?.style?.color && layer?.style?.color !== '#ff5722') {
+      color = layer.style.color;
+    } else {
+      color = getDefaultLayerStyle(layer?.name).fillColor;
     }
 
     return L.circleMarker(latlng, {

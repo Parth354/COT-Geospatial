@@ -3,6 +3,7 @@ import { FileText, Layers, CheckCircle, Loader, AlertTriangle, Database, X } fro
 import { useAppContext } from "../hooks/AppContext";
 import {datasetsAPI} from "../api/datasetsAPI.js";
 import {layerAPI} from "../api/layerAPI.js";
+import { getDefaultLayerStyle } from "../utils/hazardStyling.js";
 
 const DatasetItem = React.memo(({ dataset }) => {
     const { state, actions } = useAppContext();
@@ -45,7 +46,7 @@ const DatasetItem = React.memo(({ dataset }) => {
                 name: dataset.name,
                 visible: true,
                 type: 'vector',
-                style: dataset.style || {}
+                style: dataset.style && Object.keys(dataset.style).length > 0 ? dataset.style : getDefaultLayerStyle(dataset.name)
             });
         }
     };

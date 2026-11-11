@@ -8,6 +8,7 @@ import LayersTab from './LayerTab';
 import HistoryTab from './HistoryTab';
 import MetricsTab from './MetricsTab';
 import { resultsAPI } from '../api/resultsAPI';
+import { getDefaultLayerStyle } from '../utils/hazardStyling';
 
 function ResultPanel() {
   const { state, actions } = useAppContext();
@@ -60,6 +61,10 @@ function ResultPanel() {
   };
 
   const handleAddToMap = (layer) => {
+    const layerStyle = (layer.style && layer.style.color !== '#ff5722') 
+      ? layer.style 
+      : getDefaultLayerStyle(layer.layer_name);
+
     actions.addMapLayer({
       layerId: `${jobId}-${layer.layer_name}`,
       name: layer.layer_name,
@@ -68,7 +73,7 @@ function ResultPanel() {
       dataUrl: layer.url,
       featureCount: layer.feature_count,
       bbox: layer.bbox,
-      style: layer.style || { color: '#ff5722', fillOpacity: 0.6, weight: 2 },
+      style: layerStyle,
       datasetId: jobId,
     });
   };

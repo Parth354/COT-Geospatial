@@ -53,20 +53,27 @@ export default function MapLegend() {
   const [isOpen, setIsOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('aqi');
 
-  // Auto-detect relevant hazard based on visible layers
+  // Auto-detect relevant hazard based on visible layers (prioritizing most recently added)
   useEffect(() => {
-    const visibleNames = mapLayers
-      .filter((l) => l.visible)
-      .map((l) => (l.name || '').toLowerCase());
-
-    if (visibleNames.some((n) => n.includes('aqi') || n.includes('pollut') || n.includes('forecast') || n.includes('air'))) {
-      setActiveTab('aqi');
-    } else if (visibleNames.some((n) => n.includes('flood') || n.includes('inundat') || n.includes('submerged'))) {
-      setActiveTab('flood');
-    } else if (visibleNames.some((n) => n.includes('fire') || n.includes('hotspot') || n.includes('frp'))) {
-      setActiveTab('fire');
-    } else if (visibleNames.some((n) => n.includes('snow') || n.includes('avalanche'))) {
-      setActiveTab('avalanche');
+    const visibleLayers = mapLayers.filter((l) => l.visible);
+    for (let i = visibleLayers.length - 1; i >= 0; i--) {
+      const n = (visibleLayers[i].name || '').toLowerCase();
+      if (n.includes('flood') || n.includes('inundat') || n.includes('submerged') || n.includes('water') || n.includes('river')) {
+        setActiveTab('flood');
+        return;
+      }
+      if (n.includes('fire') || n.includes('hotspot') || n.includes('frp') || n.includes('wildfire')) {
+        setActiveTab('fire');
+        return;
+      }
+      if (n.includes('aqi') || n.includes('pollut') || n.includes('forecast') || n.includes('air') || n.includes('pm25')) {
+        setActiveTab('aqi');
+        return;
+      }
+      if (n.includes('snow') || n.includes('avalanche')) {
+        setActiveTab('avalanche');
+        return;
+      }
     }
   }, [mapLayers]);
 

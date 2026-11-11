@@ -12,11 +12,10 @@ import {
   Loader as Spinner
 } from 'lucide-react';
 import { useAppContext } from '../hooks/AppContext';
+import { getDefaultLayerStyle } from '../utils/hazardStyling.js';
 
 const getFallbackStyle = (layerName) => {
-  let hash = 0;
-  for (let i = 0; i < layerName.length; i++) hash = layerName.charCodeAt(i) + ((hash << 5) - hash);
-  return '#' + ('00000' + (hash & 0xFFFFFF).toString(16)).slice(-6);
+  return getDefaultLayerStyle(layerName).fillColor;
 };
 
 // ==============================================================================
@@ -28,12 +27,13 @@ const AvailableDatasetItem = React.memo(({ dataset }) => {
 
   const handleAddLayer = () => {
     if (isLayerAdded || dataset.status !== 'processed') return;
+    const defaultStyle = getDefaultLayerStyle(dataset.name);
     const newLayer = {
       layerId: dataset.dataset_id,
       name: dataset.name,
       type: dataset.file_type || 'vector',
       visible: true,
-      style: { color: getFallbackStyle(dataset.name), fillColor: getFallbackStyle(dataset.name), fillOpacity: 0.5 },
+      style: defaultStyle,
       bbox: null
     };
     actions.addMapLayer(newLayer);
