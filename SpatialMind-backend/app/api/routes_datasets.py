@@ -25,10 +25,32 @@ def get_db():
 def list_datasets(db: Session = Depends(get_db)):
     """
     Retrieves a list of all raw datasets that have been uploaded to the system.
+    Combines database records with local disk registry for resilient zero-downtime operation.
     """
-    datasets = db.query(Dataset).order_by(Dataset.upload_time.desc()).all()
-    # The `from_attributes=True` config in your Pydantic model handles the conversion
-    return datasets
+    from app.services.file_service import FileService
+    seen_ids = set()
+    combined_datasets = []
+
+    # 1. Fetch from PostgreSQL if available
+    try:
+        db_datasets = db.query(Dataset).order_by(Dataset.upload_time.desc()).all()
+        for d in db_datasets:
+            seen_ids.add(d.dataset_id)
+            combined_datasets.append(d)
+    except Exception as e:
+        logger.warning(f"Database query failed in list_datasets ({e}). Falling back to disk dataset registry.")
+
+    # 2. Merge any datasets from local disk registry
+    try:
+        disk_datasets = FileService.get_disk_datasets()
+        for d in disk_datasets:
+            if d.dataset_id not in seen_ids:
+                seen_ids.add(d.dataset_id)
+                combined_datasets.append(d)
+    except Exception as e:
+        logger.warning(f"Failed to scan disk datasets: {e}")
+
+    return combined_datasets
 
 
 @router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -38,43 +60,30 @@ def delete_dataset(dataset_id: str, db: Session = Depends(get_db)):
     layer features in PostGIS, and its files on the disk.
     """
     logger.info(f"Received request to delete dataset '{dataset_id}'.")
+    from app.core.config import settings
+    dataset_directory = Path(settings.UPLOAD_DIR) / dataset_id
 
-    # Use a single, comprehensive transaction for all database operations
+    # Step 1: Attempt database deletion
     try:
-        # Step 1: Find the dataset record to get file path information
         ds = db.query(Dataset).filter(Dataset.dataset_id == dataset_id).first()
-        if not ds:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
-        
-        # This is the directory that FileService created, e.g., .../uploads/<dataset_id>/
-        dataset_directory = Path(ds.file_path).parent
+        if ds:
+            db.query(Layer).filter(Layer.dataset_id == dataset_id).delete()
+            db.delete(ds)
+            db.commit()
+            logger.info(f"Successfully deleted database records for dataset '{dataset_id}'.")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"Database deletion skipped/failed for '{dataset_id}': {e}")
 
-        # Step 2: Delete associated Layer features from PostGIS first
-        # This respects foreign key constraints.
-        deleted_layer_count = db.query(Layer).filter(Layer.dataset_id == dataset_id).delete()
-        if deleted_layer_count > 0:
-            logger.info(f"Deleted {deleted_layer_count} associated layer features from PostGIS for dataset '{dataset_id}'.")
-
-        # Step 3: Delete the main dataset record
-        db.delete(ds)
-        
-        # Step 4: Commit all database changes together
-        db.commit()
-        logger.info(f"Successfully deleted database records for dataset '{dataset_id}'.")
-
-        # Step 5: Clean up the files from the disk *after* the database transaction succeeds
-        if dataset_directory.is_dir():
+    # Step 2: Clean up the files from the disk
+    if dataset_directory.is_dir():
+        try:
             shutil.rmtree(dataset_directory)
             logger.info(f"Successfully deleted data directory from disk: {dataset_directory}")
+        except Exception as e:
+            logger.error(f"Failed to delete disk directory for '{dataset_id}': {e}")
 
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Failed to delete dataset '{dataset_id}'. Error: {e}", exc_info=True)
-        # We check if it's our own HTTPException or an unexpected server error
-        if not isinstance(e, HTTPException):
-             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred while deleting the dataset.")
-        else:
-             raise e
-    
-    # HTTP 204 has no content, so we return nothing
     return

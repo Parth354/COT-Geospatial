@@ -21,14 +21,35 @@ def get_db():
 @router.get("/")
 def list_layers(request: Request, db: Session = Depends(get_db)):
     logger.info("API: Listing all layers.")
-    layers_query = db.query(Layer.layer_id, Layer.name).distinct(Layer.layer_id).all()
-    logger.info(f"API: Found {len(layers_query)} layers.")
+    results = []
+    seen = set()
+    try:
+        layers_query = db.query(Layer.layer_id, Layer.name).distinct(Layer.layer_id).all()
+        for layer in layers_query:
+            seen.add(layer.layer_id)
+            results.append({
+                "layer_id": layer.layer_id,
+                "name": layer.name,
+                "data_url": str(request.url_for('get_layer_data', layer_id=layer.layer_id))
+            })
+    except Exception as e:
+        logger.warning(f"Database layer query skipped ({e}). Listing from disk registry.")
 
-    return [{
-        "layer_id": layer.layer_id,
-        "name": layer.name,
-        "data_url": str(request.url_for('get_layer_data', layer_id=layer.layer_id))
-    } for layer in layers_query]
+    try:
+        from app.services.file_service import FileService
+        for ds in FileService.get_disk_datasets():
+            if ds.dataset_id not in seen:
+                seen.add(ds.dataset_id)
+                results.append({
+                    "layer_id": ds.dataset_id,
+                    "name": ds.name,
+                    "data_url": f"/api/layers/{ds.dataset_id}/data"
+                })
+    except Exception as ex:
+        logger.warning(f"Disk datasets listing skipped: {ex}")
+
+    logger.info(f"API: Returning {len(results)} layers.")
+    return results
 
 @router.get("/{layer_id}/debug")
 def debug_layer_data(layer_id: str, db: Session = Depends(get_db)):
@@ -74,77 +95,81 @@ def get_layer_data(
     bbox_vals = None
     if bbox:
         try:
-            logger.debug(f"Parsing bbox: {bbox}")
             bbox_vals = [float(v) for v in bbox.split(",")]
             if len(bbox_vals) != 4:
                 raise ValueError
-            logger.debug(f"Parsed bbox successfully: {bbox_vals}")
         except ValueError:
             logger.error("API: Invalid bbox format received.")
             raise HTTPException(status_code=400, detail="Invalid bbox format. Use 'west,south,east,north'.")
 
-    logger.info(f"API: Fetching layer data for layer_id: {layer_id}")
-    
-    # First verify dataset exists and check its status
-    from app.models.dataset import Dataset
-    dataset = db.query(Dataset).filter(Dataset.dataset_id == layer_id).first()
-    if dataset:
-        logger.info(f"Dataset found: {dataset.name}, status: {dataset.status}, geojson_path: {dataset.geojson_path}")
-        
-        # Check if dataset has been ingested
-        layer_count = db.query(Layer).filter(Layer.dataset_id == layer_id).count()
-        logger.info(f"Layer records in database for this dataset: {layer_count}")
-        
-        if layer_count == 0 and dataset.status == 'processed':
-            logger.warning(f"Dataset status is 'processed' but no layer records found. Ingestion may have failed silently.")
-        elif layer_count == 0 and dataset.status != 'processed':
-            logger.info(f"Dataset not yet processed (status: {dataset.status}). No layer data available yet.")
-    else:
-        logger.warning(f"Dataset with id '{layer_id}' not found in database")
-    
-    geojson = LayerService.get_layer_data(db, layer_id, bbox_vals, zoom)
+    from app.services.file_service import UPLOAD_DIR
+    import json
 
-    # Return empty FeatureCollection instead of 404 if no features found
-    # This allows the map to render without errors and handle empty layers gracefully
+    # 1. Fast local disk check (ensures immediate rendering regardless of DB state)
+    local_geojson = UPLOAD_DIR / layer_id / f"{layer_id}.geojson"
+    if local_geojson.exists():
+        try:
+            with open(local_geojson, 'r', encoding='utf-8') as f:
+                logger.info(f"API: Serving layer '{layer_id}' directly from local GeoJSON: {local_geojson}")
+                return json.load(f)
+        except Exception as ex:
+            logger.warning(f"Error reading local GeoJSON for '{layer_id}': {ex}")
+
+    # 2. Query PostGIS / LayerService if database is reachable
+    geojson = None
+    try:
+        from app.models.dataset import Dataset
+        dataset = db.query(Dataset).filter(Dataset.dataset_id == layer_id).first()
+        if dataset and dataset.geojson_path and Path(dataset.geojson_path).exists():
+            with open(dataset.geojson_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        geojson = LayerService.get_layer_data(db, layer_id, bbox_vals, zoom)
+    except Exception as e:
+        logger.warning(f"Database query failed in get_layer_data ({e}). Returning empty feature collection.")
+
     if not geojson:
-        logger.warning(f"API: LayerService returned None for layer_id: {layer_id}")
         geojson = {"type": "FeatureCollection", "features": []}
-    elif not geojson.get("features"):
-        logger.info(f"API: No features found for layer_id: {layer_id} in current view, returning empty collection")
-        geojson = {"type": "FeatureCollection", "features": []}
-
-    logger.info(f"API: Successfully fetched data for layer_id: {layer_id} ({len(geojson.get('features', []))} features)")
     return geojson
+
 
 @router.post("/ingest/{dataset_id}", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_layer_ingestion(dataset_id: str, db: Session = Depends(get_db)):
     logger.info(f"API: Received request to ingest dataset '{dataset_id}'.")
+    from app.services.file_service import FileService, UPLOAD_DIR
 
-    # Validate dataset exists
-    logger.debug(f"Checking if dataset '{dataset_id}' exists in database.")
-    dataset = db.query(Dataset).filter(Dataset.dataset_id == dataset_id).first()
-
-    if not dataset:
-        logger.error(f"API: Dataset with ID '{dataset_id}' not found in database.")
-        raise HTTPException(status_code=404, detail=f"Dataset with ID '{dataset_id}' not found.")
-
-    logger.info(f"API: Dataset found: {dataset.name} with current status: {dataset.status}")
-
-    # Check current status
-    if dataset.status in ['ingesting', 'processed']:
-         logger.warning(f"API: Dataset '{dataset_id}' is already {dataset.status}.")
-         return {
-             "message": f"Dataset is already {dataset.status}.",
-             "status": dataset.status,
-             "dataset_id": dataset_id
+    # 1. Check local disk GeoJSON first
+    local_geojson = UPLOAD_DIR / dataset_id / f"{dataset_id}.geojson"
+    if local_geojson.exists():
+        logger.info(f"API: Dataset '{dataset_id}' GeoJSON is already pre-generated on disk.")
+        return {
+            "message": "Dataset processed and ready for map viewing.",
+            "status": "processed",
+            "dataset_id": dataset_id,
+            "task_id": None
         }
 
-    # Update status before dispatching
-    logger.info(f"API: Updating dataset '{dataset_id}' status to 'ingesting'.")
-    dataset.status = 'ingesting'
-    db.commit()
-    logger.info(f"API: Dataset '{dataset_id}' status updated to 'ingesting' successfully.")
+    # 2. Check database
+    dataset = None
+    try:
+        dataset = db.query(Dataset).filter(Dataset.dataset_id == dataset_id).first()
+    except Exception as e:
+        logger.warning(f"Database lookup failed for dataset '{dataset_id}': {e}")
 
+    if not dataset:
+        dataset = FileService.get_disk_dataset(dataset_id)
+
+    if not dataset:
+        logger.error(f"API: Dataset with ID '{dataset_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Dataset with ID '{dataset_id}' not found.")
+
+    if getattr(dataset, "status", None) in ['ingesting', 'processed']:
+        return {
+            "message": f"Dataset is already {dataset.status}.",
+            "status": dataset.status,
+            "dataset_id": dataset_id
+        }
+
+    # If Celery worker active, dispatch task
     def is_celery_worker_active() -> bool:
         try:
             inspector = celery_app.control.inspect(timeout=0.3)
@@ -154,7 +179,6 @@ async def trigger_layer_ingestion(dataset_id: str, db: Session = Depends(get_db)
 
     if is_celery_worker_active():
         try:
-            logger.info(f"API: Dispatching Celery task for dataset '{dataset_id}'.")
             task_result = celery_app.send_task(
                "app.tasks.ingest_dataset.ingest_dataset_into_layer",
                 args=[dataset_id],
@@ -169,10 +193,9 @@ async def trigger_layer_ingestion(dataset_id: str, db: Session = Depends(get_db)
         except Exception as e:
             logger.warning(f"Celery dispatch failed: {e}")
 
-    # Direct background thread execution
+    # Fallback: Background thread
     import threading
     from app.services.layer_ingestion_service import ingest_dataset_into_layer
-    logger.info(f"API: Running ingestion in immediate background thread for '{dataset_id}'.")
     thread = threading.Thread(target=ingest_dataset_into_layer, args=(dataset_id,))
     thread.daemon = True
     thread.start()

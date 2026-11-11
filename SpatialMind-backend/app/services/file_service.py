@@ -6,6 +6,7 @@ import zipfile
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
 
 import geopandas as gpd
 import pandas as pd
@@ -32,7 +33,88 @@ REQUIRED_SHP_COMPONENTS = {".shp", ".shx", ".dbf", ".prj"}
 POSSIBLE_LON_COLS = ['lon', 'long', 'longitude', 'x']
 POSSIBLE_LAT_COLS = ['lat', 'latitude', 'y']
 
+class SimpleDataset:
+    """Lightweight in-memory and disk fallback Dataset representation when PostgreSQL is offline."""
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    def __repr__(self):
+        return f"<SimpleDataset id={getattr(self, 'dataset_id', None)} name={getattr(self, 'name', None)}>"
+
 class FileService:
+    @staticmethod
+    def get_disk_datasets() -> List[Any]:
+        """Scans the uploads directory for locally registered datasets."""
+        datasets = []
+        if not UPLOAD_DIR.exists():
+            return datasets
+        for folder in UPLOAD_DIR.iterdir():
+            if folder.is_dir():
+                meta_file = folder / "metadata.json"
+                if meta_file.exists():
+                    try:
+                        data = json.loads(meta_file.read_text(encoding="utf-8"))
+                        up_time = None
+                        if data.get("upload_time"):
+                            try:
+                                up_time = datetime.fromisoformat(data["upload_time"])
+                            except Exception:
+                                up_time = datetime.now(timezone.utc)
+                        else:
+                            up_time = datetime.now(timezone.utc)
+
+                        datasets.append(SimpleDataset(
+                            dataset_id=data.get("dataset_id", folder.name),
+                            name=data.get("name", folder.name),
+                            file_type=data.get("file_type", "geojson"),
+                            file_path=data.get("file_path"),
+                            geojson_path=data.get("geojson_path"),
+                            size_mb=float(data.get("size_mb", 0.0)),
+                            feature_count=int(data.get("feature_count", 0)),
+                            bbox=data.get("bbox", {}),
+                            crs=data.get("crs", "EPSG:4326"),
+                            status=data.get("status", "processed"),
+                            tags=data.get("tags", []),
+                            upload_time=up_time
+                        ))
+                    except Exception as e:
+                        logger.warning(f"Failed to read dataset metadata from {meta_file}: {e}")
+        return datasets
+
+    @staticmethod
+    def get_disk_dataset(dataset_id: str) -> Optional[Any]:
+        folder = UPLOAD_DIR / dataset_id
+        meta_file = folder / "metadata.json"
+        if meta_file.exists():
+            try:
+                data = json.loads(meta_file.read_text(encoding="utf-8"))
+                up_time = None
+                if data.get("upload_time"):
+                    try:
+                        up_time = datetime.fromisoformat(data["upload_time"])
+                    except Exception:
+                        up_time = datetime.now(timezone.utc)
+                else:
+                    up_time = datetime.now(timezone.utc)
+
+                return SimpleDataset(
+                    dataset_id=data.get("dataset_id", folder.name),
+                    name=data.get("name", folder.name),
+                    file_type=data.get("file_type", "geojson"),
+                    file_path=data.get("file_path"),
+                    geojson_path=data.get("geojson_path"),
+                    size_mb=float(data.get("size_mb", 0.0)),
+                    feature_count=int(data.get("feature_count", 0)),
+                    bbox=data.get("bbox", {}),
+                    crs=data.get("crs", "EPSG:4326"),
+                    status=data.get("status", "processed"),
+                    tags=data.get("tags", []),
+                    upload_time=up_time
+                )
+            except Exception as e:
+                logger.warning(f"Failed to read metadata for dataset '{dataset_id}': {e}")
+        return None
     @staticmethod
     def save_file(file: UploadFile, metadata: UploadMetadata) -> Dataset:
         """
@@ -76,34 +158,74 @@ class FileService:
             else:
                 raise HTTPException(status_code=400, detail=f"Unsupported file type: {validated_type}")
 
-            # Stage 4: Create and commit the database record
-            db = SessionLocal()
+            # Stage 4: Persist dataset metadata to disk registry first for fault tolerance
+            now_utc = datetime.now(timezone.utc)
+            meta_dict = {
+                "dataset_id": dataset_id,
+                "name": metadata.name or original_filename,
+                "file_type": validated_type,
+                "file_path": str(input_path),
+                "geojson_path": str(geojson_path) if geojson_path else None,
+                "size_mb": round(input_path.stat().st_size / (1024 * 1024), 2),
+                "feature_count": geo_info.get("feature_count", 0),
+                "bbox": geo_info.get("bbox", {}),
+                "crs": geo_info.get("crs", "N/A"),
+                "status": "processed",
+                "tags": metadata.tags if isinstance(metadata.tags, list) else [],
+                "upload_time": now_utc.isoformat(),
+            }
+            meta_file = dataset_dir / "metadata.json"
+            meta_file.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+
+            # Stage 5: Attempt PostgreSQL database record registration
             try:
-                ds = Dataset(
-                    dataset_id=dataset_id,
-                    name=metadata.name or original_filename,
-                    file_type=validated_type,
-                    file_path=str(input_path),
-                    geojson_path=str(geojson_path) if geojson_path else None,
-                    size_mb=round(input_path.stat().st_size / (1024 * 1024), 2),
-                    feature_count=geo_info.get("feature_count", 0),
-                    bbox=geo_info.get("bbox", {}),
-                    crs=geo_info.get("crs", "N/A"),
-                    status="uploaded",
-                    tags=metadata.tags if isinstance(metadata.tags, list) else [],
+                db = SessionLocal()
+                try:
+                    ds = Dataset(
+                        dataset_id=dataset_id,
+                        name=meta_dict["name"],
+                        file_type=meta_dict["file_type"],
+                        file_path=meta_dict["file_path"],
+                        geojson_path=meta_dict["geojson_path"],
+                        size_mb=meta_dict["size_mb"],
+                        feature_count=meta_dict["feature_count"],
+                        bbox=meta_dict["bbox"],
+                        crs=meta_dict["crs"],
+                        status="processed",
+                        tags=meta_dict["tags"],
+                    )
+                    db.add(ds)
+                    db.commit()
+                    db.refresh(ds)
+                    logger.info(f"Successfully saved and registered dataset '{ds.name}' (ID: {ds.dataset_id}) in PostgreSQL.")
+                    return ds
+                finally:
+                    db.close()
+            except Exception as db_err:
+                logger.warning(
+                    f"PostgreSQL dataset registration unavailable: {db_err}. "
+                    f"Dataset '{meta_dict['name']}' safely persisted to local disk registry."
                 )
-                db.add(ds)
-                db.commit()
-                db.refresh(ds)
-                logger.info(f"Successfully saved and registered dataset '{ds.name}' (ID: {ds.dataset_id}).")
-                return ds
-            finally:
-                db.close()
+                return SimpleDataset(
+                    dataset_id=dataset_id,
+                    name=meta_dict["name"],
+                    file_type=meta_dict["file_type"],
+                    file_path=meta_dict["file_path"],
+                    geojson_path=meta_dict["geojson_path"],
+                    size_mb=meta_dict["size_mb"],
+                    feature_count=meta_dict["feature_count"],
+                    bbox=meta_dict["bbox"],
+                    crs=meta_dict["crs"],
+                    status="processed",
+                    tags=meta_dict["tags"],
+                    upload_time=now_utc,
+                )
 
         except Exception as e:
-            if dataset_dir.exists():
+            # Only clean up directory if file conversion genuinely failed before saving metadata
+            if dataset_dir.exists() and not (dataset_dir / "metadata.json").exists():
                 shutil.rmtree(dataset_dir)
-            logger.error(f"Upload process failed for file '{original_filename}'. Cleaning up. Error: {e}", exc_info=True)
+            logger.error(f"Upload process failed for file '{original_filename}'. Error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"An internal error occurred during file processing: {e}")
 
     @staticmethod
