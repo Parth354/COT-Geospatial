@@ -50,7 +50,7 @@ const HAZARD_SCALES = {
 export default function MapLegend() {
   const { state } = useAppContext();
   const { mapLayers = [] } = state;
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('aqi');
 
   // Auto-detect relevant hazard based on visible layers (prioritizing most recently added)
@@ -84,7 +84,9 @@ export default function MapLegend() {
       {/* Header */}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between px-3 py-2 cursor-pointer select-none bg-gray-50/90 rounded-t-lg border-b border-gray-100 hover:bg-gray-100 transition-colors"
+        className={`flex items-center justify-between px-3 py-2 cursor-pointer select-none bg-gray-50/90 hover:bg-gray-100 transition-colors ${
+          isOpen ? 'rounded-t-lg border-b border-gray-100' : 'rounded-lg'
+        }`}
       >
         <div className="flex items-center gap-1.5 font-semibold text-gray-700">
           <Layers className="h-3.5 w-3.5 text-blue-600" />
